@@ -22,7 +22,7 @@ def get_repos() -> list:
     #Check if directories in DIRECTORIES variable exist and stop execution if they do not
     for directory in PARENT_DIRECTORIES:
         if not os.path.isdir(directory):
-            print(f"{RED}Error, Given repo directories do not exist!{RESET}")
+            print(f"{RED}[GITY] -> Error, Given repo directories do not exist!{RESET}")
             quit()
     
     for directory in PARENT_DIRECTORIES:
@@ -35,33 +35,33 @@ def get_repos() -> list:
 
 def pull_repos(repositories: list):
     for repo in repositories:
-        print(f"{YELLOW}Executing git pull on [{repo}]{RESET}")
+        print(f"{YELLOW}[GITY] -> Executing git pull on [{repo}]{RESET}")
         try:
             os.chdir(repo)
             pull_result = subprocess.run(['git', 'pull'], capture_output=True, text=True)
             return_code = subprocess.call(['git', 'pull'])
         except Exception as e:
-            print(f"{RED}Error, unable to execute git pull on {repo}\n Exception: {e}{RESET}")
+            print(f"{RED}[GITY] -> Error, unable to execute git pull on {repo}\n Exception: {e}{RESET}")
 
 def push_repos(repositories: list):
     for repo in repositories:
-        print(f"{YELLOW}Executing git push on [{repo}]{RESET}")
+        print(f"{YELLOW}[GITY] -> Executing git push on [{repo}]{RESET}")
         try:
             os.chdir(repo)
             push_result = subprocess.run(['git', 'push'], capture_output=True, text=True)
             return_code = subprocess.call(['git', 'push'])
         except Exception as e:
-            print(f"{RED}Error, unable to execute git push on {repo}\n Exception: {e}{RESET}")
+            print(f"{RED}[GITY] -> Error, unable to execute git push on {repo}\n Exception: {e}{RESET}")
 
 def status_repos(repositories: list):
     for repo in repositories:
-        print(f"{YELLOW}Executing git status on [{repo}]{RESET}")
+        print(f"{YELLOW}[GITY] -> Executing git status on [{repo}]{RESET}")
         try:
             os.chdir(repo)
             status_result = subprocess.run(['git', 'status'], capture_output=True, text=True)
             return_code = subprocess.call(['git', 'status'])
         except Exception as e:
-            print(f"{RED}Error, unable to execute git status on {repo}\n Exception: {e}{RESET}")
+            print(f"{RED}[GITY] -> Error, unable to execute git status on {repo}\n Exception: {e}{RESET}")
 
 def main():
     #Variables
