@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+
+#Built in imports
+import os
+import subprocess
+import sys
+
+#Get user who is running script
+original_user = os.environ.get('SUDO_USER') or os.getlogin()
+
+#Global variables
+PARENT_DIRECTORIES = [f"/home/{original_user}/Documents/",]
+#ANSI colors
+YELLOW = "\033[33m"
+BLUE = "\033[34m"
+RED = "\033[31m"
+RESET = "\033[0m" #Reset default to color
+
+def get_repos() -> list: 
+    repositories = list()
+
+    #Check if directories in DIRECTORIES variable exist and stop execution if they do not
+    for directory in PARENT_DIRECTORIES:
+        if not os.path.isdir(directory):
+            print(f"{RED}Error, Given repo directories do not exist!{RESET}")
+            quit()
+    
+    for directory in PARENT_DIRECTORIES:
+        os.chdir(directory)
+        for child_directory in os.listdir(directory):
+            if os.path.isdir(f"{directory}{child_directory}/.git"):
+                repositories.append(f"{directory}{child_directory}")
+    
+    return repositories
+
+def pull_repos(repositories: list):
+    for repo in repositories:
+        print(f"{YELLOW}Executing git pull on [{repo}]{RESET}")
+        try:
+            os.chdir(repo)
+            pull_result = subprocess.run(['git', 'pull'], capture_output=True, text=True)
+            return_code = subprocess.call(['git', 'pull'])
+        except Exception as e:
+            print(f"{RED}Error, unable to execute git pull on {repo}\n Exception: {e}{RESET}")
+
+def push_repos(repositories: list):
+    for repo in repositories:
+        print(f"{YELLOW}Executing git push on [{repo}]{RESET}")
+        try:
+            os.chdir(repo)
+            push_result = subprocess.run(['git', 'push'], capture_output=True, text=True)
+            return_code = subprocess.call(['git', 'push'])
+        except Exception as e:
+            print(f"{RED}Error, unable to execute git push on {repo}\n Exception: {e}{RESET}")
+
+def status_repos(repositories: list):
+    for repo in repositories:
+        print(f"{YELLOW}Executing git status on [{repo}]{RESET}")
+        try:
+            os.chdir(repo)
+            status_result = subprocess.run(['git', 'status'], capture_output=True, text=True)
+            return_code = subprocess.call(['git', 'status'])
+        except Exception as e:
+            print(f"{RED}Error, unable to execute git status on {repo}\n Exception: {e}{RESET}")
+
+def main():
+    #Variables
+    repositories = get_repos()
+    #Flag variables
+    pull = bool(False)
+    push = bool(False)
+    status = bool(False)
+    help = bool(False)
+    version_info = bool(False)
+    list_repos = bool(False)
+
+    #Process arguments
+    for arg in sys.argv:
+        if arg == "pull":
+            pull = True
+        if arg == "push":
+            push = True
+        if arg == "list":
+            list_repos = True
+        if arg == "stat" or arg == "status":
+            status = True
+        if arg == "help":
+            help = True
+        if arg == "ver" or arg == "version":
+            version_info = True
+
+    #Run based on arguments
+    if pull == True:
+        pull_repos(repositories)
+    elif push == True:
+        push_repos(repositories)
+    elif status == True:
+        status_repos(repositories)
+    elif list_repos == True:
+        print("Parent directories Gity will search:")
+        for parent in PARENT_DIRECTORIES:
+            print(f" -- {parent}")
+        print("Repositories Found:")
+        for repo in repositories:
+            print(f" -- {repo}")
+    elif help == True:
+        print("Commands: ")
+        print(" -- List parent directories: gity list")
+        print(" -- Pull all repositories: gity pull")
+        print(" -- Push all repositories: gity push")
+        print(" -- Get status on all repositories: gity [stat/status]")
+        print(" -- Get version info: gity [version/ver]")
+    elif version_info == True:
+        print("Version: 0.1")
+        print("Creator: Nolan Provencher")
+        print("GitHub: https://github.com/ner216/gity")
+    else:
+        print("Invalid or unknown options used.")
+        print("Get help with: `gity help`")
+
+main()
+
