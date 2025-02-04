@@ -16,8 +16,8 @@ BLUE = "\033[34m"
 RED = "\033[31m"
 RESET = "\033[0m" #Reset default to color
 
-def get_repos() -> list: 
-    repositories = list()
+def find_local_repositories() -> list: 
+    repositories = []
 
     #Check if directories in DIRECTORIES variable exist and stop execution if they do not
     for directory in PARENT_DIRECTORIES:
@@ -33,7 +33,7 @@ def get_repos() -> list:
     
     return repositories
 
-def pull_repos(repositories: list):
+def pull_repos(repositories: list) -> None:
     for repo in repositories:
         print(f"{YELLOW}[GITY] -> Executing git pull on [{repo}]{RESET}")
         try:
@@ -43,7 +43,7 @@ def pull_repos(repositories: list):
         except Exception as e:
             print(f"{RED}[GITY] -> Error, unable to execute git pull on {repo}\n Exception: {e}{RESET}")
 
-def push_repos(repositories: list):
+def push_repos(repositories: list) -> None:
     for repo in repositories:
         print(f"{YELLOW}[GITY] -> Executing git push on [{repo}]{RESET}")
         try:
@@ -53,7 +53,7 @@ def push_repos(repositories: list):
         except Exception as e:
             print(f"{RED}[GITY] -> Error, unable to execute git push on {repo}\n Exception: {e}{RESET}")
 
-def status_repos(repositories: list):
+def status_repos(repositories: list) -> None:
     for repo in repositories:
         print(f"{YELLOW}[GITY] -> Executing git status on [{repo}]{RESET}")
         try:
@@ -65,45 +65,45 @@ def status_repos(repositories: list):
 
 def main():
     #Variables
-    repositories = get_repos()
+    local_repositories = find_local_repositories()
     #Flag variables
-    pull = bool(False)
-    push = bool(False)
-    status = bool(False)
-    help = bool(False)
-    version_info = bool(False)
-    list_repos = bool(False)
-
+    pull_arg = False
+    push_arg = False
+    status_arg = False
+    help_arg = False
+    version_info = False
+    list_local_repos = False
+    
     #Process arguments
     for arg in sys.argv:
         if arg == "pull":
-            pull = True
+            pull_arg = True
         if arg == "push":
-            push = True
+            push_arg = True
         if arg == "list":
-            list_repos = True
+            list_local_repos = True
         if arg == "stat" or arg == "status":
-            status = True
+            status_arg = True
         if arg == "help":
             help = True
         if arg == "ver" or arg == "version":
             version_info = True
 
     #Run based on arguments
-    if pull == True:
-        pull_repos(repositories)
-    elif push == True:
-        push_repos(repositories)
-    elif status == True:
-        status_repos(repositories)
-    elif list_repos == True:
+    if pull_arg == True:
+        pull_repos(local_repositories)
+    elif push_arg == True:
+        push_repos(local_repositories)
+    elif status_arg == True:
+        status_repos(local_repositories)
+    elif list_local_repos == True:
         print("Parent directories Gity will search:")
         for parent in PARENT_DIRECTORIES:
             print(f" -- {parent}")
         print("Repositories Found:")
         for repo in repositories:
             print(f" -- {repo}")
-    elif help == True:
+    elif help_arg == True:
         print("Commands: ")
         print(" -- List parent directories: gity list")
         print(" -- Pull all repositories: gity pull")
@@ -113,7 +113,7 @@ def main():
     elif version_info == True:
         print("Version: 0.1")
         print("Creator: Nolan Provencher")
-        print("GitHub: https://github.com/ner216/gity")
+        print("GitHub: https://github.com/ner216/linux_scripts")
     else:
         print("Invalid or unknown options used.")
         print("Get help with: `gity help`")

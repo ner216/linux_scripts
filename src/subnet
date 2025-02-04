@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+
+#Simple command line subnet calculator
+
+#Built in imports
+import os
+import subprocess
+import sys
