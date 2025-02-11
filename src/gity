@@ -9,7 +9,7 @@ import sys
 original_user = os.environ.get('SUDO_USER') or os.getlogin()
 
 #Global variables
-PARENT_DIRECTORIES = [f"/home/{original_user}/Documents/",]
+PARENT_DIRECTORIES = [f"/home/{original_user}/Documents/","/home/git/",f"/home/{original_user}/git/"]
 #ANSI colors
 YELLOW = "\033[33m"
 BLUE = "\033[34m"
@@ -19,17 +19,13 @@ RESET = "\033[0m" #Reset default to color
 def find_local_repositories() -> list: 
     repositories = []
 
-    #Check if directories in DIRECTORIES variable exist and stop execution if they do not
+    #Check if directories in DIRECTORIES variable exist and return repos
     for directory in PARENT_DIRECTORIES:
-        if not os.path.isdir(directory):
-            print(f"{RED}[GITY] -> Error, Given repo directories do not exist!{RESET}")
-            quit()
-    
-    for directory in PARENT_DIRECTORIES:
-        os.chdir(directory)
-        for child_directory in os.listdir(directory):
-            if os.path.isdir(f"{directory}{child_directory}/.git"):
-                repositories.append(f"{directory}{child_directory}")
+        if os.path.isdir(directory):
+            os.chdir(directory)
+            for child_directory in os.listdir(directory):
+                if os.path.isdir(f"{directory}{child_directory}/.git"):
+                    repositories.append(f"{directory}{child_directory}")
     
     return repositories
 
@@ -85,7 +81,7 @@ def main():
         if arg == "stat" or arg == "status":
             status_arg = True
         if arg == "help":
-            help = True
+            help_arg = True
         if arg == "ver" or arg == "version":
             version_info = True
 
@@ -101,7 +97,7 @@ def main():
         for parent in PARENT_DIRECTORIES:
             print(f" -- {parent}")
         print("Repositories Found:")
-        for repo in repositories:
+        for repo in local_repositories:
             print(f" -- {repo}")
     elif help_arg == True:
         print("Commands: ")
