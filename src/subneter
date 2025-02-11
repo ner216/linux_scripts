@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+
+#This script will calculate class C subnet ranges based on given requirements
+#Created by Nolan Provencher
+
+class subnet:
+    def __init__(self):
+        self.binary_decimal_table = {2:1,4:2,8:3,16:4,32:5,64:6,128:7}
+        self.bit_values = [128,64,32,16,8,4,2,1]
+        self.network_bit_borrow = 0 
+        self.host_bit_borrow = 0 
+        self.decimal_value = 0
+        self.usable_hosts = 0
+        self.block_size = 0
+        self.modified_subnet_mask = 0
+        self.usable_stat = 0
+        #create bit chart of network binary_bits with self.binary_decimal_table keys
+        self.binary_bits = list(self.binary_decimal_table.keys())
+
+
+    def network_side_subnet(self, networks_needed, usable_host_address):
+        #find a num of binary_bits that is greater than required
+        for bit in self.binary_bits:
+            if bit >= networks_needed:
+                self.network_bit_borrow = self.binary_decimal_table[bit]
+                self.decimal_value = bit
+                break
+        self.host_bit_borrow = (8 - self.network_bit_borrow)   #---------> host binary_bits borrowed
+        
+        #create modified subnet mask octet by adding the borrowed binary_bits
+        for bit in range(self.network_bit_borrow):
+            self.modified_subnet_mask += self.bit_values[bit] #-----------> modified subnet mask
+       
+        #take last value of I and assign it as the number of usable hosts
+        self.block_size = self.bit_values[bit] #------------> calc block_size
+        self.usable_hosts = (self.block_size - 2) #--------->calculate usable hosts from block size
+        if usable_host_address <= self.usable_hosts:
+            self.usable_stat = "There are enough usable host addresses per subnet"
+        else:
+            self.usable_stat = "There are not enough usable hosts per subnet"
+
+
+    def host_side_subnet(self, usable_host_address):
+        for inx,i in enumerate(self.bit_values):
+            if i < usable_host_address:
+                self.block_size = self.bit_values[self.bit_values.index(i)-1]
+                break
+        self.usable_hosts = self.block_size - 2
+        #use the last value of i as an index of the bit chart to find subnets created
+        self.decimal_value = self.binary_bits[inx-1]
+        #use self.created as index in binary_decimal_table to find network binary_bits borrowed
+        self.network_bit_borrow = self.binary_decimal_table[self.decimal_value]
+        self.host_bit_borrow = 8 - self.network_bit_borrow
+        #use for loop to add binary_bits creating modified net mask.
+        for bit in range(self.network_bit_borrow):
+            self.modified_subnet_mask += self.bit_values[bit]
+        if usable_host_address <= self.usable_hosts:
+            self.usable_stat = "There are enough usable host addresses per subnet"
+        else:
+            self.usable_stat = "There are not enough usable hosts per subnet"
+        
+
+    def display_subnet_statistics(self):
+        print("\nAnswer:")
+        print(f"\nSubnets created: {self.decimal_value}")
+        print(f"Network bits borrowed: {self.network_bit_borrow}")
+        print(f"Host bits borrowed: {self.host_bit_borrow}")
+        print(f"Number of possible addresses per subnet: {self.block_size}")
+        print(f"Number of usable addresses per subnet: {self.usable_hosts}")
+        print(f"Netmask: 255.255.255.{self.modified_subnet_mask}")
+        print(self.usable_stat)
+
+
+    def display_subnet_ranges(self, net):
+        subnet_id = 1
+        address_octet = 0
+        print("\nAddress Ranges:")
+        while address_octet < 255:
+            print("---------------------------------")
+            print(f"Subnet {subnet_id}: Network number: {net}.{address_octet}")
+            print(f"Usable start: {net}.{address_octet+1}")
+            address_octet += self.block_size
+            print(f"Usable end: {net}.{address_octet-2}")
+            print(f"Broadcast: {net}.{address_octet-1}")
+            subnet_id += 1
+           
+
+def main():
+    quit = False
+    while quit == False:
+        print("Solve a class C subnetting equations(enter to quit)")
+        choice = input("Solve problem with priority to network(n) or Host(h): ")
+        if choice.lower() == "n":
+            network_address = input("Enter network address(fromat= 255.255.255): ")
+            networks_needed = int(input("Enter number of networks needed: "))
+            usable_host_address = int(input("Enter number of usable hosts needed per network: "))
+            netproblem = subnet()
+            netproblem.network_side_subnet(networks_needed, usable_host_address)
+            netproblem.display_subnet_statistics()
+            netproblem.display_subnet_ranges(network_address)
+            print("\n")
+        elif choice.lower() == "h":
+            network_address = input("Enter network address(format= 255.255.255): ")
+            usable_host_address = int(input("Enter number of usable hosts needed per network: "))
+            hostproblem = subnet()
+            hostproblem.host_side_subnet(usable_host_address)
+            hostproblem.display_subnet_statistics()
+            hostproblem.display_subnet_ranges(network_address)
+            print("\n")
+        else:
+            quit = True
+
+
+main()

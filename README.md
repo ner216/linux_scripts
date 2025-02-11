@@ -20,4 +20,6 @@ You can copy files from `/src/` directory to your `/usr/local/bin` direcotory to
 - ### gity
     - Runs a git command on all local git repositories at once.
     - To get started with gity, Run: `gity help`
+- ### subneter
+    - Calculates class C subnet ranges based on given network requirements.
     
