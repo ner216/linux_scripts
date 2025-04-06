@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+
+#Interactive scipt to manage Rclone sync
+
+import os
+import subprocess
+import sys
+import yaml
+
+#ANSI colors
+YELLOW = "\033[33m"
+BLUE = "\033[34m"
+RED = "\033[31m"
+GREEN = "\033[92m"
+RESET = "\033[0m" #Reset default to color
+
+#Get command user
+USER = os.getlogin()
+
+#PATHS
+#Path of sync directory on local system
+global_src_path = ""
+#Path of sync directory on Google drive
+global_dst_path = "/"
+# Get the current working directory
+CURRENT_DIR = os.getcwd()
+#Cache directory
+CACHE_DIR = f"/home/{USER}/.cache/cld/"
+#Config directory
+CONFIG_DIR = f"/home/{USER}/.config/cld/"
+
+#REMOTES
+#Personal Google drive remote name
+global_personal_remote = ""
+
+
+def help():
+    print("*This command only takes one argument*\n")
+    print(" -Perform rclone sync against the remote: 'cld push'")
+    print(" -Perform rclone sync against the local system: 'cld pull'")
+    print(" -Reset/Create new config for cld: 'cld reset-config'")
+    print(" -Delete cld data from system: 'cld delete-all-data'")
+    print(" -Verbose: '-v' or 'verbose'")
+    print(" -Help: 'cld help'")
+
+def make_config():
+    print("Welcome to the cld tool! Start by setting up the config;")
+    #Create CACHE directory if it does not exist
+    if not os.path.exists(CACHE_DIR):
+        os.mkdir(CACHE_DIR)
+    
+    #Variable declarations
+    src_path = ""
+    dst_path = ""
+    personal_remote = ""
+    config_data = {}
+
+    #Input from user
+    src_path = input("Enter the absolute path of the local folder you wish to sync to: ")
+    dst_path = input("Enter the absolute path of the remote folder to sync from: ")
+    personal_remote = input("Enter the name of your remote set in rclone: ")
+
+    #Create config data
+    config_data = {
+        "src_path": src_path,
+        "dst_path": dst_path,
+        "personal_remote": personal_remote
+    }
+
+    #Create config directory
+    if not os.path.exists(CONFIG_DIR):
+        os.mkdir(CONFIG_DIR)
+    
+    #Save config
+    try:
+        with open(f"{CONFIG_DIR}/cld", "w") as file:
+            yaml.dump(config_data, file)
+    except Exception as e:
+        print(f"{RED}Error: Unable to save config.\n E: {e}{RESET}")
+
+
+
+def get_config():
+    #Global variable declarations
+    global global_src_path
+    global global_dst_path 
+    global global_personal_remote
+
+    if os.path.exists(f"{CONFIG_DIR}/cld"):
+        with open(f"{CONFIG_DIR}/cld", "r") as file:
+            config_data = yaml.safe_load(file)
+
+        global_src_path = config_data["src_path"]
+        global_dst_path = config_data["dst_path"]
+        global_personal_remote = config_data["personal_remote"]
+    else:
+        make_config()
+
+
+def delete_all_data():
+    try:
+        if os.path.exists(CACHE_DIR):
+            os.rmdir(CACHE_DIR)
+        if os.path.exists(CONFIG_DIR):
+            os.rmdir(CONFIG_DIR)
+
+        print("DATA HAS BEEN REMOVED")
+    except Exception as e:
+        print(f"{RED}Error, Unable to delete data.\n E: {e}{RESET}")
+
+
+#Get and print changes that will be made to files if rclone sync is used   
+def print_changes(direction: str, verbose: bool = False):
+    #Runtime variables
+    result = ""
+    missing_on_dst = []
+    missing_on_src = []
+
+    #Get file changes
+    try:
+        result = subprocess.run(
+            ['rclone', 'check', f'{global_personal_remote}:{global_dst_path}', f'{global_src_path}', '--missing-on-dst', f'{CACHE_DIR}tmp-dst', '--missing-on-src', f'{CACHE_DIR}tmp-src'], 
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL
+            )
+        if verbose == True:
+            print(f"{RED}{result.stderr}{RESET}")
+        
+        #Read and store directory differences between source and remote
+        try:
+            with open(f"{CACHE_DIR}tmp-dst", "r") as file:
+                for line in file:
+                    line = line.rstrip("\n")
+                    missing_on_dst.append(line)
+            os.remove(f"{CACHE_DIR}tmp-dst")
+        except Exception as e:
+            print(f"{RED}Error: Unable to open/read tmp-dst file.\n E: {e}{RESET}")
+
+        try:
+            with open(f"{CACHE_DIR}tmp-src", "r") as file:
+                for line in file:
+                    line = line.rstrip("\n")
+                    missing_on_src.append(line)
+            os.remove(f"{CACHE_DIR}tmp-src")
+        except Exception as e:
+            print(f"{RED}Error: Unable to open/read tmp-src file.\n E: {e}{RESET}")
+
+    except Exception as e:
+        print(f"{RED}Error: Unable to get rclone check against destination.\n E: {e}{RESET}")
+
+    #Print file changes with respect to instance that is being synced to
+    if direction == "pull":
+        print("Changes to to be made to source(system):")
+        if len(missing_on_dst) > 0 or len(missing_on_src) > 0:
+            for file_name in missing_on_dst:
+                print(f"{RED} -- {file_name}{RESET}")
+            for file_name in missing_on_src:
+                print(f"{GREEN} ++ {file_name}{RESET}")
+        else:
+            print(f"{GREEN} None; local and remote match.{RESET}")
+    
+    elif direction == "push":
+        print("Changes to to be made to remote(cloud):")
+        if len(missing_on_dst) > 0 or len(missing_on_src) > 0:
+            for file_name in missing_on_dst:
+                print(f"{GREEN} ++ {file_name}{RESET}")
+            for file_name in missing_on_src:
+                print(f"{RED} -- {file_name}{RESET}")
+        else:
+            print(f"{GREEN} None; local and remote match.{RESET}")
+        
+    else:
+        print(f"{RED}Error, invalid direction argument sent to print_changes(){RESET}")
+
+
+#Handles the rclone sync command
+def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push' or 'pull'
+    #runtime variables
+    choice = ""
+    result = ""
+
+    #Print directory differences with respect to the directory being synced
+    print_changes(direction)
+
+    if direction == "pull":
+        choice = input("\nWould you like to continue with sync pull?(y/N): ")
+        if choice == "y":
+            try:
+                #Source and dest flipped as the local folder is the temporary destination
+                result = subprocess.run(
+                    ['rclone', 'sync', f'{global_personal_remote}:{global_dst_path}', f'{global_src_path}', '-P'], 
+                    stdout=subprocess.DEVNULL, 
+                    stderr=subprocess.DEVNULL
+                    )
+                if verbose == True:
+                    print(f"{RED}{result}{RESET}")
+            except Exception as e:
+                print("{RED}Error: Unable to pull with rclone.\n E: {e}{RESET}")
+        else:
+            print("Sync canceled")
+    elif direction == "push":
+        choice = input("\nWould you like to continue with sync push?(y/N): ")
+        if choice == "y":
+            try:
+                result = subprocess.run(
+                    ['rclone', 'sync', f'{global_src_path}', f'{global_personal_remote}:{global_dst_path}', '-P'], 
+                    stdout=subprocess.DEVNULL, 
+                    stderr=subprocess.DEVNULL
+                    )
+                if verbose == True:
+                    print(f"{RED}{result}{RESET}")
+                print("Done.")
+            except Exception as e:
+                print("{RED}Error: Unable to pull with rclone.\n E: {e}{RESET}")
+        else:
+            print("Sync canceled")
+    else:
+        print("{RED}Error, Invalid direction argument given to rclone-sync(){RESET}")
+
+
+def main():
+    #Flag variables
+    push_arg = False
+    pull_arg = False
+    help_arg = False
+    verbose_arg = False
+    delete_data_arg = False
+    reset_config_arg = False
+
+    #Help argument possibility list
+    help_arg_list = ["help", "--help", "-h"]
+    verbose_arg_list = ["-v", "verbose", "--verbose"]
+
+    #Get Config
+    get_config()
+
+    #Set flags based on arguments
+    for arg in sys.argv:
+        if arg == "pull":
+            pull_arg = True
+        if arg == "push":
+            push_arg = True
+        if arg in help_arg_list:
+            help_arg = True
+        if arg in verbose_arg_list:
+            verbose_arg = True
+        if arg == "reset-config":
+            reset_config_arg = True
+        if arg == "delete-all-data":
+            delete_data_arg = True
+    
+    #Run command based on arguments
+    if push_arg == True:
+        rclone_sync(direction="push", verbose=verbose_arg)
+    elif pull_arg == True:
+        rclone_sync(direction="pull", verbose=verbose_arg)
+    elif help_arg == True:
+        help()
+    elif reset_config_arg == True:
+        make_config()
+    elif delete_data_arg == True:
+        delete_all_data()
+    else:
+        help()
+
+
+main()
