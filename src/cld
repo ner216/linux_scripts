@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import yaml
+import shutil
 
 #ANSI colors
 YELLOW = "\033[33m"
@@ -57,7 +58,11 @@ def make_config():
 
     #Input from user
     src_path = input("Enter the absolute path of the local folder you wish to sync to: ")
+    if src_path[-1] != "/":
+        src_path = src_path + "/"
     dst_path = input("Enter the absolute path of the remote folder to sync from: ")
+    if dst_path[-1] != "/":
+        dst_path = dst_path + "/"
     personal_remote = input("Enter the name of your remote set in rclone: ")
 
     #Create config data
@@ -80,7 +85,7 @@ def make_config():
 
 
 
-def get_config():
+def get_config() -> bool:
     #Global variable declarations
     global global_src_path
     global global_dst_path 
@@ -93,16 +98,18 @@ def get_config():
         global_src_path = config_data["src_path"]
         global_dst_path = config_data["dst_path"]
         global_personal_remote = config_data["personal_remote"]
+
+        return True #Return true if config is found
     else:
-        make_config()
+        return False #Return false if config is not found
 
 
 def delete_all_data():
     try:
         if os.path.exists(CACHE_DIR):
-            os.rmdir(CACHE_DIR)
+            shutil.rmtree(CACHE_DIR)
         if os.path.exists(CONFIG_DIR):
-            os.rmdir(CONFIG_DIR)
+            shutil.rmtree(CONFIG_DIR)
 
         print("DATA HAS BEEN REMOVED")
     except Exception as e:
@@ -185,6 +192,7 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
     if direction == "pull":
         choice = input("\nWould you like to continue with sync pull?(y/N): ")
         if choice == "y":
+            print("Working...")
             try:
                 #Source and dest flipped as the local folder is the temporary destination
                 result = subprocess.run(
@@ -202,6 +210,7 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
     elif direction == "push":
         choice = input("\nWould you like to continue with sync push?(y/N): ")
         if choice == "y":
+            print("Working...")
             try:
                 result = subprocess.run(
                     ['rclone', 'sync', f'{global_src_path}', f'{global_personal_remote}:{global_dst_path}', '-P'], 
@@ -227,13 +236,11 @@ def main():
     verbose_arg = False
     delete_data_arg = False
     reset_config_arg = False
+    config_found = False
 
     #Help argument possibility list
     help_arg_list = ["help", "--help", "-h"]
     verbose_arg_list = ["-v", "verbose", "--verbose"]
-
-    #Get Config
-    get_config()
 
     #Set flags based on arguments
     for arg in sys.argv:
@@ -249,6 +256,12 @@ def main():
             reset_config_arg = True
         if arg == "delete-all-data":
             delete_data_arg = True
+
+    #Load config values from config, get_config() returns a bool for config existance.
+    config_found = get_config() 
+    if config_found == False:
+        make_config()
+        exit()
     
     #Run command based on arguments
     if push_arg == True:
