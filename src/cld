@@ -34,7 +34,7 @@ CONFIG_DIR = f"/home/{USER}/.config/cld/"
 #Personal Google drive remote name
 global_personal_remote = ""
 
-
+#Functions for information messages---------------------------------------------------------------------
 def help():
     print("*This command only takes one argument*\n")
     print(" -Perform rclone sync against the remote: 'cld push'")
@@ -44,17 +44,33 @@ def help():
     print(" -Verbose: '-v' or 'verbose'")
     print(" -Help: 'cld help'")
 
+#Functions for configuration----------------------------------------------------------------------------
 def make_config():
-    print("Welcome to the cld tool! Start by setting up the config;")
-    #Create CACHE directory if it does not exist
-    if not os.path.exists(CACHE_DIR):
-        os.mkdir(CACHE_DIR)
+    print("Welcome to the cld tool!")
     
     #Variable declarations
     src_path = ""
     dst_path = ""
     personal_remote = ""
     config_data = {}
+    setup_rclone = ""
+
+    #Prompt to setup Rclone before cld setup
+    print("Rclone must be configured before using cld.\nWould you like to configure it now?")
+    while setup_rclone != "y" and setup_rclone != "n":
+        setup_rclone = input("(y/n) > ")
+        if setup_rclone.lower() == "y":
+            try:
+                print(f"{GREEN}--> Rclone{RESET}")
+                os.system("rclone config")
+            except Exception as e:
+                print(f"{RED}Error: Unable to execute `rclone config`.\n E: {e}{RESET}")
+                exit()
+
+    #cld setup
+    #Create CACHE directory if it does not exist
+    if not os.path.exists(CACHE_DIR):
+        os.mkdir(CACHE_DIR)
 
     #Input from user
     src_path = input("Enter the absolute path of the local folder you wish to sync to: ")
@@ -115,45 +131,49 @@ def delete_all_data():
     except Exception as e:
         print(f"{RED}Error, Unable to delete data.\n E: {e}{RESET}")
 
-
+#Functions for one-way syncing--------------------------------------------------------
 #Get and print changes that will be made to files if rclone sync is used   
 def print_changes(direction: str, verbose: bool = False):
+    #commands
+    rclone_check_command = f"rclone check {global_src_path} {global_personal_remote}:{global_dst_path} --missing-on-dst {CACHE_DIR}tmp-dst --missing-on-src {CACHE_DIR}tmp-src"
     #Runtime variables
     result = ""
     missing_on_dst = []
     missing_on_src = []
 
     #Get file changes
+    #try:
+    result = subprocess.run(
+        rclone_check_command, 
+        capture_output=True, 
+        text=True,
+        shell=True,
+        )
+    if verbose == True:
+        print(f"{RED}{result.stderr}{RESET}")
+        print(f"{GREEN}{result.stdout}{RESET}")
+    
+    #Read and store directory differences between source and remote
     try:
-        result = subprocess.run(
-            ['rclone', 'check', f'{global_src_path}', f'{global_personal_remote}:{global_dst_path}', '--missing-on-dst', f'{CACHE_DIR}tmp-dst', '--missing-on-src', f'{CACHE_DIR}tmp-src'], 
-            stdout=subprocess.DEVNULL, 
-            stderr=subprocess.DEVNULL
-            )
-        if verbose == True:
-            print(f"{RED}{result.stderr}{RESET}")
-        
-        #Read and store directory differences between source and remote
-        try:
-            with open(f"{CACHE_DIR}tmp-dst", "r") as file:
-                for line in file:
-                    line = line.rstrip("\n")
-                    missing_on_dst.append(line)
-            os.remove(f"{CACHE_DIR}tmp-dst")
-        except Exception as e:
-            print(f"{RED}Error: Unable to open/read tmp-dst file.\n E: {e}{RESET}")
-
-        try:
-            with open(f"{CACHE_DIR}tmp-src", "r") as file:
-                for line in file:
-                    line = line.rstrip("\n")
-                    missing_on_src.append(line)
-            os.remove(f"{CACHE_DIR}tmp-src")
-        except Exception as e:
-            print(f"{RED}Error: Unable to open/read tmp-src file.\n E: {e}{RESET}")
-
+        with open(f"{CACHE_DIR}tmp-dst", "r") as file:
+            for line in file:
+                line = line.rstrip("\n")
+                missing_on_dst.append(line)
+        os.remove(f"{CACHE_DIR}tmp-dst")
     except Exception as e:
-        print(f"{RED}Error: Unable to get rclone check against destination.\n E: {e}{RESET}")
+        print(f"{RED}Error: Unable to open/read tmp-dst file.\n E: {e}{RESET}")
+
+    try:
+        with open(f"{CACHE_DIR}tmp-src", "r") as file:
+            for line in file:
+                line = line.rstrip("\n")
+                missing_on_src.append(line)
+        os.remove(f"{CACHE_DIR}tmp-src")
+    except Exception as e:
+        print(f"{RED}Error: Unable to open/read tmp-src file.\n E: {e}{RESET}")
+
+    #except Exception as e:
+        #print(f"{RED}Error: Unable to get rclone check against destination.\n E: {e}{RESET}")
 
     #Print file changes with respect to instance that is being synced to
     if direction == "pull":
@@ -182,6 +202,9 @@ def print_changes(direction: str, verbose: bool = False):
 
 #Handles the rclone sync command
 def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push' or 'pull'
+    #commands
+    rclone_pull_command = f"rclone sync {global_personal_remote}:{global_dst_path} {global_src_path} -P"
+    rclone_push_command = f"rclone sync {global_src_path} {global_personal_remote}:{global_dst_path} -P"
     #runtime variables
     choice = ""
     result = ""
@@ -196,12 +219,14 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
             try:
                 #Source and dest flipped as the local folder is the temporary destination
                 result = subprocess.run(
-                    ['rclone', 'sync', f'{global_personal_remote}:{global_dst_path}', f'{global_src_path}', '-P'], 
-                    stdout=subprocess.DEVNULL, 
-                    stderr=subprocess.DEVNULL
+                    rclone_pull_command, 
+                    capture_output=True,
+                    text=True,
+                    shell=True,
                     )
                 if verbose == True:
-                    print(f"{RED}{result}{RESET}")
+                    print(f"{RED}{result.stderr}{RESET}")
+                    print(f"{GREEN}{result.stdout}{RESET}")
                 print("Done.")
             except Exception as e:
                 print("{RED}Error: Unable to pull with rclone.\n E: {e}{RESET}")
@@ -213,12 +238,14 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
             print("Working...")
             try:
                 result = subprocess.run(
-                    ['rclone', 'sync', f'{global_src_path}', f'{global_personal_remote}:{global_dst_path}', '-P'], 
-                    stdout=subprocess.DEVNULL, 
-                    stderr=subprocess.DEVNULL
+                    rclone_push_command, 
+                    capture_output=True,
+                    text=True,
+                    shell=True,
                     )
                 if verbose == True:
-                    print(f"{RED}{result}{RESET}")
+                    print(f"{RED}{result.stderr}{RESET}")
+                    print(f"{GREEN}{result.stdout}{RESET}")
                 print("Done.")
             except Exception as e:
                 print("{RED}Error: Unable to pull with rclone.\n E: {e}{RESET}")
