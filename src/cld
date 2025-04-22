@@ -42,7 +42,15 @@ def help():
     print(" -Reset/Create new config for cld: 'cld reset-config'")
     print(" -Delete cld data from system: 'cld delete-all-data'")
     print(" -Verbose: '-v' or 'verbose'")
+    print(" -exit codes: 'codes' or 'error-codes'")
     print(" -Help: 'cld help'")
+
+def exit_codes():
+    print("Exit codes for cld:")
+    print("0 -- Command run successfully")
+    print("1 -- General error")
+    print("126 -- Shell command could not be run")
+    print("127 -- Shell command does not exist in PATH")
 
 #Functions for configuration----------------------------------------------------------------------------
 def make_config():
@@ -62,10 +70,13 @@ def make_config():
         if setup_rclone.lower() == "y":
             try:
                 print(f"{GREEN}--> Rclone{RESET}")
-                os.system("rclone config")
-            except Exception as e:
+                status_result = subprocess.getstatusoutput("rclone config")
+                if status_result[0] != 0:
+                    print(f"{RED}Error, unable to execute `rclone config`.{RESET}")
+                    exit(127)
+            except subprocess.CalledProcessError as e:
                 print(f"{RED}Error: Unable to execute `rclone config`.\n E: {e}{RESET}")
-                exit()
+                exit(126)
 
     #cld setup
     #Create CACHE directory if it does not exist
@@ -98,6 +109,7 @@ def make_config():
             yaml.dump(config_data, file)
     except Exception as e:
         print(f"{RED}Error: Unable to save config.\n E: {e}{RESET}")
+        exit(126)
 
 
 
@@ -130,6 +142,7 @@ def delete_all_data():
         print("DATA HAS BEEN REMOVED")
     except Exception as e:
         print(f"{RED}Error, Unable to delete data.\n E: {e}{RESET}")
+        exit(126)
 
 #Functions for one-way syncing--------------------------------------------------------
 #Get and print changes that will be made to files if rclone sync is used   
@@ -141,17 +154,23 @@ def print_changes(direction: str, verbose: bool = False):
     missing_on_dst = []
     missing_on_src = []
 
+    #Print warning that program does not show file modification changes:
+    print(f"{YELLOW}Warning: cld does not currently print file modification updates, only add/remove!{RESET}")
+
     #Get file changes
-    #try:
-    result = subprocess.run(
-        rclone_check_command, 
-        capture_output=True, 
-        text=True,
-        shell=True,
-        )
-    if verbose == True:
-        print(f"{RED}{result.stderr}{RESET}")
-        print(f"{GREEN}{result.stdout}{RESET}")
+    try:
+        result = subprocess.run(
+            rclone_check_command, 
+            capture_output=True, 
+            text=True,
+            shell=True,
+            )
+        if verbose == True:
+            print(f"{RED}{result.stderr}{RESET}")
+            print(f"{GREEN}{result.stdout}{RESET}")
+    except Exception as e:
+        print(f"{RED}Error: Unable to get rclone check against destination.\n E: {e}{RESET}")
+        exit(126)
     
     #Read and store directory differences between source and remote
     try:
@@ -162,6 +181,7 @@ def print_changes(direction: str, verbose: bool = False):
         os.remove(f"{CACHE_DIR}tmp-dst")
     except Exception as e:
         print(f"{RED}Error: Unable to open/read tmp-dst file.\n E: {e}{RESET}")
+        exit(126)
 
     try:
         with open(f"{CACHE_DIR}tmp-src", "r") as file:
@@ -171,13 +191,11 @@ def print_changes(direction: str, verbose: bool = False):
         os.remove(f"{CACHE_DIR}tmp-src")
     except Exception as e:
         print(f"{RED}Error: Unable to open/read tmp-src file.\n E: {e}{RESET}")
-
-    #except Exception as e:
-        #print(f"{RED}Error: Unable to get rclone check against destination.\n E: {e}{RESET}")
+        exit(126)
 
     #Print file changes with respect to instance that is being synced to
     if direction == "pull":
-        print("Changes to to be made to source(system):")
+        print(f"File {GREEN}ADD{RESET}/{RED}Remove{RESET} made to source(system):")
         if len(missing_on_dst) > 0 or len(missing_on_src) > 0:
             for file_name in missing_on_dst:
                 print(f"{RED} -- {file_name}{RESET}")
@@ -187,7 +205,7 @@ def print_changes(direction: str, verbose: bool = False):
             print(f"{GREEN} None; local and remote match.{RESET}")
     
     elif direction == "push":
-        print("Changes to to be made to remote(cloud):")
+        print(f"File {GREEN}ADD{RESET}/{RED}Remove{RESET} made to remote(cloud):")
         if len(missing_on_dst) > 0 or len(missing_on_src) > 0:
             for file_name in missing_on_dst:
                 print(f"{GREEN} ++ {file_name}{RESET}")
@@ -230,6 +248,7 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
                 print("Done.")
             except Exception as e:
                 print("{RED}Error: Unable to pull with rclone.\n E: {e}{RESET}")
+                exit(126)
         else:
             print("Sync canceled")
     elif direction == "push":
@@ -249,6 +268,7 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
                 print("Done.")
             except Exception as e:
                 print("{RED}Error: Unable to pull with rclone.\n E: {e}{RESET}")
+                exit(126)
         else:
             print("Sync canceled")
     else:
@@ -259,11 +279,12 @@ def main():
     #Flag variables
     push_arg = False
     pull_arg = False
-    help_arg = False
     verbose_arg = False
     delete_data_arg = False
     reset_config_arg = False
+
     config_found = False
+
 
     #Help argument possibility list
     help_arg_list = ["help", "--help", "-h"]
@@ -275,28 +296,30 @@ def main():
             pull_arg = True
         if arg == "push":
             push_arg = True
-        if arg in help_arg_list:
-            help_arg = True
         if arg in verbose_arg_list:
             verbose_arg = True
         if arg == "reset-config":
             reset_config_arg = True
         if arg == "delete-all-data":
             delete_data_arg = True
-
+        if arg in help_arg_list:
+            help()
+            exit(0)
+        if arg == "codes" or arg == "error-codes":
+            exit_codes()
+            exit(0)
+    
     #Load config values from config, get_config() returns a bool for config existance.
     config_found = get_config() 
     if config_found == False:
         make_config()
-        exit()
+        exit(0)
     
     #Run command based on arguments
     if push_arg == True:
         rclone_sync(direction="push", verbose=verbose_arg)
     elif pull_arg == True:
         rclone_sync(direction="pull", verbose=verbose_arg)
-    elif help_arg == True:
-        help()
     elif reset_config_arg == True:
         make_config()
     elif delete_data_arg == True:
