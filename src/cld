@@ -7,6 +7,7 @@ import subprocess
 import sys
 import yaml
 import shutil
+import datetime
 
 #ANSI colors
 YELLOW = "\033[33m"
@@ -41,6 +42,7 @@ def help():
     print(" -Perform rclone sync against the local system: 'cld pull'")
     print(" -Reset/Create new config for cld: 'cld reset-config'")
     print(" -Delete cld data from system: 'cld delete-all-data'")
+    print(" -Get last push and pull dates: 'hist' or 'history'")
     print(" -Verbose: '-v' or 'verbose'")
     print(" -exit codes: 'codes' or 'error-codes'")
     print(" -Help: 'cld help'")
@@ -51,6 +53,7 @@ def exit_codes():
     print("1 -- General error")
     print("126 -- Shell command could not be run")
     print("127 -- Shell command does not exist in PATH")
+    print("128 -- Internal fault")
 
 #Functions for configuration----------------------------------------------------------------------------
 def make_config():
@@ -70,10 +73,12 @@ def make_config():
         if setup_rclone.lower() == "y":
             try:
                 print(f"{GREEN}--> Rclone{RESET}")
-                status_result = subprocess.getstatusoutput("rclone config")
-                if status_result[0] != 0:
-                    print(f"{RED}Error, unable to execute `rclone config`.{RESET}")
+                rclone_present = shutil.which("rclone") is not None
+                if rclone_present == False:
+                    print(f"{RED}Error, Rclone could not be located in PATH. Is it installed?{RESET}")
                     exit(127)
+                else:
+                    os.system("rclone config")
             except subprocess.CalledProcessError as e:
                 print(f"{RED}Error: Unable to execute `rclone config`.\n E: {e}{RESET}")
                 exit(126)
@@ -111,6 +116,54 @@ def make_config():
         print(f"{RED}Error: Unable to save config.\n E: {e}{RESET}")
         exit(126)
 
+def save_push_pull_dates(direction: str):
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+    dates_data = {}
+
+    #load timestamp file if it exists
+    if os.path.exists(f"{CACHE_DIR}/timestamp"):
+        with open(f"{CACHE_DIR}/timestamp","r") as file:
+            dates_data = yaml.safe_load(file)
+    else:
+        dates_data = {
+            "last_pull": None,
+            "last_push": None
+        }
+
+    #Set new date
+    if direction == "pull":
+        dates_data["last_pull"] = current_time
+    elif direction == "push":
+        dates_data["last_push"] = current_time
+    else:
+        print(f"{RED}Error, Invalid parameter sent to `save_push_pull_dates`\n Param sent: {direction}{RESET}")
+        exit(128)
+
+    #Save timestamp file
+    try:
+        with open(f"{CACHE_DIR}/timestamp", "w") as file:
+            yaml.dump(dates_data, file)
+    except Exception as e:
+        print(f"{RED}Error, Unable to save time data.\n E: {e}{RESET}")
+        exit(126)
+
+
+def get_last_push_pull() -> dict:
+    dates_data = {}
+
+    #Get time data from file
+    if os.path.exists(f"{CACHE_DIR}/timestamp"):
+        with open(f"{CACHE_DIR}/timestamp", "r") as file:
+            dates_data = yaml.safe_load(file)
+    else:
+        dates_data = {
+            "last_pull": None,
+            "last_push": None
+        }
+
+    #Display data
+    print(f"Last cld pull: {YELLOW}{dates_data["last_pull"]}{RESET}")
+    print(f"Last cld push: {YELLOW}{dates_data["last_push"]}{RESET}")
 
 
 def get_config() -> bool:
@@ -195,7 +248,7 @@ def print_changes(direction: str, verbose: bool = False):
 
     #Print file changes with respect to instance that is being synced to
     if direction == "pull":
-        print(f"File {GREEN}ADD{RESET}/{RED}Remove{RESET} made to source(system):")
+        print(f"File {GREEN}ADD{RESET}/{RED}REMOVE{RESET} made to source(system):")
         if len(missing_on_dst) > 0 or len(missing_on_src) > 0:
             for file_name in missing_on_dst:
                 print(f"{RED} -- {file_name}{RESET}")
@@ -205,7 +258,7 @@ def print_changes(direction: str, verbose: bool = False):
             print(f"{GREEN} None; local and remote match.{RESET}")
     
     elif direction == "push":
-        print(f"File {GREEN}ADD{RESET}/{RED}Remove{RESET} made to remote(cloud):")
+        print(f"File {GREEN}ADD{RESET}/{RED}REMOVE{RESET} made to remote(cloud):")
         if len(missing_on_dst) > 0 or len(missing_on_src) > 0:
             for file_name in missing_on_dst:
                 print(f"{GREEN} ++ {file_name}{RESET}")
@@ -245,6 +298,7 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
                 if verbose == True:
                     print(f"{RED}{result.stderr}{RESET}")
                     print(f"{GREEN}{result.stdout}{RESET}")
+                save_push_pull_dates("pull")
                 print("Done.")
             except Exception as e:
                 print("{RED}Error: Unable to pull with rclone.\n E: {e}{RESET}")
@@ -265,6 +319,7 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
                 if verbose == True:
                     print(f"{RED}{result.stderr}{RESET}")
                     print(f"{GREEN}{result.stdout}{RESET}")
+                save_push_pull_dates("push")
                 print("Done.")
             except Exception as e:
                 print("{RED}Error: Unable to pull with rclone.\n E: {e}{RESET}")
@@ -302,6 +357,9 @@ def main():
             reset_config_arg = True
         if arg == "delete-all-data":
             delete_data_arg = True
+        if arg == "history" or arg == "hist":
+            get_last_push_pull()
+            exit(0)
         if arg in help_arg_list:
             help()
             exit(0)
