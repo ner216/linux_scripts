@@ -9,7 +9,12 @@ import sys
 original_user = os.environ.get('SUDO_USER') or os.getlogin()
 
 #Global variables
-PARENT_DIRECTORIES = [f"/home/{original_user}/Documents/","/home/git/",f"/home/{original_user}/git/"]
+PARENT_DIRECTORIES = [f"/home/{original_user}/Documents/",
+    "/home/git/",
+    "/home/Git/",
+    f"/home/{original_user}/git/",
+    f"/home/{original_user}/Git/"
+    ]
 #ANSI colors
 YELLOW = "\033[33m"
 BLUE = "\033[34m"
