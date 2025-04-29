@@ -199,16 +199,14 @@ def delete_all_data():
 
 #Functions for one-way syncing--------------------------------------------------------
 #Get and print changes that will be made to files if rclone sync is used   
-def print_changes(direction: str, verbose: bool = False):
+def print_changes(direction: str, verbose: bool):
     #commands
-    rclone_check_command = f"rclone check {global_src_path} {global_personal_remote}:{global_dst_path} --missing-on-dst {CACHE_DIR}tmp-dst --missing-on-src {CACHE_DIR}tmp-src"
+    rclone_check_command = f"rclone check {global_src_path} {global_personal_remote}:{global_dst_path} --missing-on-dst {CACHE_DIR}tmp-dst --missing-on-src {CACHE_DIR}tmp-src --differ={CACHE_DIR}tmp-dif --fast-list"
     #Runtime variables
     result = ""
     missing_on_dst = []
     missing_on_src = []
-
-    #Print warning that program does not show file modification changes:
-    print(f"{YELLOW}Warning: cld does not currently print file modification updates, only add/remove!{RESET}")
+    diff = []
 
     #Get file changes
     try:
@@ -219,13 +217,26 @@ def print_changes(direction: str, verbose: bool = False):
             shell=True,
             )
         if verbose == True:
-            print(f"{RED}{result.stderr}{RESET}")
-            print(f"{GREEN}{result.stdout}{RESET}")
+            print(f"{YELLOW} --> Rclone output: <-- {RESET}")
+            print(f"{result.stdout}")
+            print(f"{YELLOW} --> Rclone errors: <-- {RESET}")
+            print(f"{RED}{result.stderr}{RESET}\n")
+
     except Exception as e:
         print(f"{RED}Error: Unable to get rclone check against destination.\n E: {e}{RESET}")
         exit(126)
     
     #Read and store directory differences between source and remote
+    try:
+        with open(f"{CACHE_DIR}tmp-dif", "r") as file:
+            for line in file:
+                line = line.rstrip("\n")
+                diff.append(line)
+        os.remove(f"{CACHE_DIR}tmp-dif")
+    except Exception as e:
+        print(f"{RED}Error: Unable to open/read tmp-dif file.\n E: {e}{RESET}")
+        exit(126)
+
     try:
         with open(f"{CACHE_DIR}tmp-dst", "r") as file:
             for line in file:
@@ -248,22 +259,26 @@ def print_changes(direction: str, verbose: bool = False):
 
     #Print file changes with respect to instance that is being synced to
     if direction == "pull":
-        print(f"File {GREEN}ADD{RESET}/{RED}REMOVE{RESET} made to source(system):")
+        print(f"File {GREEN}ADD{RESET}/{RED}REMOVE{RESET}/{YELLOW}MODIFY{RESET} made to source(system):")
         if len(missing_on_dst) > 0 or len(missing_on_src) > 0:
             for file_name in missing_on_dst:
                 print(f"{RED} -- {file_name}{RESET}")
             for file_name in missing_on_src:
                 print(f"{GREEN} ++ {file_name}{RESET}")
+            for file_name in diff:
+                print(f"{YELLOW} ** {file_name}{RESET}")
         else:
             print(f"{GREEN} None; local and remote match.{RESET}")
     
     elif direction == "push":
-        print(f"File {GREEN}ADD{RESET}/{RED}REMOVE{RESET} made to remote(cloud):")
+        print(f"File {GREEN}ADD{RESET}/{RED}REMOVE{RESET}/{YELLOW}MODIFY{RESET} made to remote(cloud):")
         if len(missing_on_dst) > 0 or len(missing_on_src) > 0:
             for file_name in missing_on_dst:
                 print(f"{GREEN} ++ {file_name}{RESET}")
             for file_name in missing_on_src:
                 print(f"{RED} -- {file_name}{RESET}")
+            for file_name in diff:
+                print(f"{YELLOW} ** {file_name}{RESET}")
         else:
             print(f"{GREEN} None; local and remote match.{RESET}")
         
@@ -272,7 +287,7 @@ def print_changes(direction: str, verbose: bool = False):
 
 
 #Handles the rclone sync command
-def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push' or 'pull'
+def rclone_sync(direction: str, verbose: bool): #direction can be 'push' or 'pull'
     #commands
     rclone_pull_command = f"rclone sync {global_personal_remote}:{global_dst_path} {global_src_path} -P"
     rclone_push_command = f"rclone sync {global_src_path} {global_personal_remote}:{global_dst_path} -P"
@@ -281,7 +296,7 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
     result = ""
 
     #Print directory differences with respect to the directory being synced
-    print_changes(direction)
+    print_changes(direction, verbose)
 
     if direction == "pull":
         choice = input("\nWould you like to continue with sync pull?(y/N): ")
@@ -296,8 +311,11 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
                     shell=True,
                     )
                 if verbose == True:
-                    print(f"{RED}{result.stderr}{RESET}")
-                    print(f"{GREEN}{result.stdout}{RESET}")
+                    print(f"{YELLOW} --> Rclone output: <-- {RESET}")
+                    print(f"{result.stdout}")
+                    print(f"{YELLOW} --> Rclone errors: <-- {RESET}")
+                    print(f"{RED}{result.stderr}{RESET}\n")
+
                 save_push_pull_dates("pull")
                 print("Done.")
             except Exception as e:
@@ -317,8 +335,11 @@ def rclone_sync(direction: str, verbose: bool = False): #direction can be 'push'
                     shell=True,
                     )
                 if verbose == True:
-                    print(f"{RED}{result.stderr}{RESET}")
-                    print(f"{GREEN}{result.stdout}{RESET}")
+                    print(f"{YELLOW} --> Rclone output: <-- {RESET}")
+                    print(f"{result.stdout}")
+                    print(f"{YELLOW} --> Rclone errors: <-- {RESET}")
+                    print(f"{RED}{result.stderr}{RESET}\n")
+
                 save_push_pull_dates("push")
                 print("Done.")
             except Exception as e:
