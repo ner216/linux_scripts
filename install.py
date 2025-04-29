@@ -46,16 +46,13 @@ def main():
     scripts_to_install = []
     print(f"This script is used to copy or remove scripts from the {INSTALL_PATH} directory.")
     #Flag variables
-    install_arg = False
     uninstall_arg = False
     help_arg = False
     version_info_arg = False
 
     #Process arguments
     for arg in sys.argv:
-        if str(arg) == "install":
-            install_arg = True
-        elif arg == "uninstall":
+        if arg == "uninstall":
             uninstall_arg = True
         elif str(arg) == "help":
             help_arg = True
@@ -78,21 +75,6 @@ def main():
         print("Creator: Nolan Provencher")
         print("GitHub: https://github.com/ner216/linux_scripts")
         exit()
-    elif install_arg == True:
-        print("Scipts that can be installed: ")
-        if len(select_script_by_name) == 0: #No script name as arguments were used
-            for script in all_script_names:
-                print(f" {script}")
-            scripts_to_install = all_script_names
-        else:
-            for script in select_script_by_name:
-                print(f" {script}")
-            scripts_to_install = select_script_by_name
-        install_confirmation = input(f"Copy scripts to {INSTALL_PATH}?(y/N) ")
-        if install_confirmation == "y":
-            copy_scipts(scripts_to_install)
-        else:
-            exit()
     elif uninstall_arg == True:
         print("Scipts to be uninstalled: ")
         if len(select_script_by_name) == 0: #No script name as arguments were used
@@ -108,9 +90,22 @@ def main():
             remove_scipts(scripts_to_install)
         else:
             exit()
-    else:
-        print("Error, invalid arguments. Use `install.py help` for help.")
-        exit()
+    else: #Run install option by default
+        print("Scipts that can be installed: ")
+        if len(select_script_by_name) == 0: #No script name as arguments were used
+            for script in all_script_names:
+                print(f" {script}")
+            scripts_to_install = all_script_names
+        else:
+            for script in select_script_by_name:
+                print(f" {script}")
+            scripts_to_install = select_script_by_name
+        install_confirmation = input(f"Copy scripts to {INSTALL_PATH}?(y/N) ")
+        if install_confirmation == "y":
+            copy_scipts(scripts_to_install)
+            print("Done.")
+        else:
+            exit()
 
 main()
 
