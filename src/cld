@@ -217,10 +217,14 @@ def print_changes(direction: str, verbose: bool):
             shell=True,
             )
         if verbose == True:
-            print(f"{YELLOW} --> Rclone output: <-- {RESET}")
-            print(f"{result.stdout}")
-            print(f"{YELLOW} --> Rclone errors: <-- {RESET}")
-            print(f"{RED}{result.stderr}{RESET}\n")
+            if len(result.stdout) != 0:
+                print(f"\n{YELLOW} --- Rclone output: --- {RESET}")
+                print(f"{result.stdout}")
+                print(f"\n{YELLOW} --- ----- --- {RESET}")
+            if len(result.stderr) != 0:
+                print(f"\n{YELLOW} --- Rclone errors: --- {RESET}")
+                print(f"{RED}{result.stderr}{RESET}\n")
+                print(f"\n{YELLOW} --- ----- --- {RESET}")
 
     except Exception as e:
         print(f"{RED}Error: Unable to get rclone check against destination.\n E: {e}{RESET}")
@@ -311,10 +315,14 @@ def rclone_sync(direction: str, verbose: bool): #direction can be 'push' or 'pul
                     shell=True,
                     )
                 if verbose == True:
-                    print(f"{YELLOW} --> Rclone output: <-- {RESET}")
-                    print(f"{result.stdout}")
-                    print(f"{YELLOW} --> Rclone errors: <-- {RESET}")
-                    print(f"{RED}{result.stderr}{RESET}\n")
+                    if len(result.stdout) != 0:
+                        print(f"\n{YELLOW} --- Rclone output: --- {RESET}")
+                        print(f"{result.stdout}")
+                        print(f"\n{YELLOW} --- ----- --- {RESET}")
+                    if len(result.stderr) != 0:
+                        print(f"\n{YELLOW} --- Rclone errors: --- {RESET}")
+                        print(f"{RED}{result.stderr}{RESET}\n")
+                        print(f"\n{YELLOW} --- ----- --- {RESET}")
 
                 save_push_pull_dates("pull")
                 print("Done.")
@@ -335,10 +343,14 @@ def rclone_sync(direction: str, verbose: bool): #direction can be 'push' or 'pul
                     shell=True,
                     )
                 if verbose == True:
-                    print(f"{YELLOW} --> Rclone output: <-- {RESET}")
-                    print(f"{result.stdout}")
-                    print(f"{YELLOW} --> Rclone errors: <-- {RESET}")
-                    print(f"{RED}{result.stderr}{RESET}\n")
+                    if len(result.stdout) != 0:
+                        print(f"\n{YELLOW} --- Rclone output: --- {RESET}")
+                        print(f"{result.stdout}")
+                        print(f"\n{YELLOW} --- ----- --- {RESET}")
+                    if len(result.stderr) != 0:
+                        print(f"\n{YELLOW} --- Rclone errors: --- {RESET}")
+                        print(f"{RED}{result.stderr}{RESET}\n")
+                        print(f"\n{YELLOW} --- ----- --- {RESET}")
 
                 save_push_pull_dates("push")
                 print("Done.")
