@@ -35,6 +35,12 @@ def find_local_repositories() -> list:
     return repositories
 
 def pull_repos(repositories: list) -> None:
+    print(f"{YELLOW}Warning! Executing git pull on all local repositories is not best practice!{RESET}")
+    confirm = input("Would you like to proceed? (N/y) > ")
+    if confirm != "y":
+        print("Command canceled")
+        exit(0)
+
     for repo in repositories:
         print(f"{YELLOW}[GITY] -> Executing git pull on [{repo}]{RESET}")
         try:
@@ -45,6 +51,12 @@ def pull_repos(repositories: list) -> None:
             print(f"{RED}[GITY] -> Error, unable to execute git pull on {repo}\n Exception: {e}{RESET}")
 
 def push_repos(repositories: list) -> None:
+    print(f"{YELLOW}Warning! Executing git push on all local repositories is not best practice!{RESET}")
+    confirm = input("Would you like to proceed? (N/y) > ")
+    if confirm != "y":
+        print("Command canceled")
+        exit(0)
+
     for repo in repositories:
         print(f"{YELLOW}[GITY] -> Executing git push on [{repo}]{RESET}")
         try:
