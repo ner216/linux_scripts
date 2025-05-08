@@ -56,15 +56,33 @@ def exit_codes():
     print("128 -- Internal fault")
 
 #Functions for configuration----------------------------------------------------------------------------
-def set_active_profile(profile_name: str):
+def set_active_profile(profile_name: str) -> None:
     try:
-        with open(f"{CONFIG_DIR}/active_profile") as file:
-            file.write(profile_name, "w")
+        with open(f"{CONFIG_DIR}/active_profile", "w") as file:
+            file.write(profile_name)
     except Exception as e:
         print(f"{RED}Error, unable to save active profile.{RESET}")
         exit(128)
 
-def make_or_remove_profile(operation: str):
+
+def get_active_profile() -> str:
+    profile = ""
+
+    try:
+        with open(f"{CONFIG_DIR}/active_profile", "r") as file:
+            profile = file.read()
+            return profile
+    except Exception as e:
+        print(f"{RED}Error, unable to save active profile.{RESET}")
+        exit(128)
+
+def display_profiles() -> None:
+    print("Available profiles:")
+    for profile in os.listdir(f"{CONFIG_DIR}"):
+        if "active_profile" not in profile:
+            print(f" {profile}")
+
+def make_or_remove_profile(operation: str) -> None:
     #Variable declarations
     src_path = ""
     dst_path = ""
@@ -117,7 +135,6 @@ def make_config():
     print("Welcome to the cld tool!")
     
     #Variable declarations
-    config_data = {}
     setup_rclone = ""
 
     #Prompt to setup Rclone before cld setup
@@ -138,11 +155,14 @@ def make_config():
                 exit(126)
 
     #cld setup
-    print("Now, we will set up your first cld profile.")
     #Create CACHE directory if it does not exist
     if not os.path.exists(CACHE_DIR):
         os.mkdir(CACHE_DIR)
 
+    #Make profile
+    make_profile = input("Would you like to make a new cld profile?\n (y/N) > ")
+    if make_profile == "y":
+        make_or_remove_profile("make")
 
 
 def save_push_pull_dates(direction: str):
@@ -200,14 +220,18 @@ def get_config() -> bool:
     global global_src_path
     global global_dst_path 
     global global_personal_remote
+    global global_active_profile
+    
+    #Get active profile
+    global_active_profile = get_active_profile()
 
-    if os.path.exists(f"{CONFIG_DIR}/cld"):
-        with open(f"{CONFIG_DIR}/cld", "r") as file:
-            config_data = yaml.safe_load(file)
+    if os.path.exists(f"{CONFIG_DIR}/{global_active_profile}"):
+        with open(f"{CONFIG_DIR}/{global_active_profile}", "r") as file:
+            profile_data = yaml.safe_load(file)
 
-        global_src_path = config_data["src_path"]
-        global_dst_path = config_data["dst_path"]
-        global_personal_remote = config_data["personal_remote"]
+        global_src_path = profile_data["src_path"]
+        global_dst_path = profile_data["dst_path"]
+        global_personal_remote = profile_data["personal_remote"]
 
         return True #Return true if config is found
     else:
@@ -329,6 +353,7 @@ def rclone_sync(direction: str, verbose: bool): #direction can be 'push' or 'pul
     result = ""
 
     #Print directory differences with respect to the directory being synced
+    print(f"{GREEN}ACTIVE PROFILE: {global_active_profile}")
     print_changes(direction, verbose)
 
     if direction == "pull":
