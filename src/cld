@@ -56,13 +56,67 @@ def exit_codes():
     print("128 -- Internal fault")
 
 #Functions for configuration----------------------------------------------------------------------------
-def make_config():
-    print("Welcome to the cld tool!")
-    
+def set_active_profile(profile_name: str):
+    try:
+        with open(f"{CONFIG_DIR}/active_profile") as file:
+            file.write(profile_name, "w")
+    except Exception as e:
+        print(f"{RED}Error, unable to save active profile.{RESET}")
+        exit(128)
+
+def make_or_remove_profile(operation: str):
     #Variable declarations
     src_path = ""
     dst_path = ""
     personal_remote = ""
+    
+    if operation == "make":
+        #Input from user
+        while " " not in profile_name:
+            print("Enter the name for the new profile.")
+            profile_name = input(f"{YELLOW} Note: profile name may not have spaces{RESET}\n > ")
+        src_path = input("Enter the absolute path of the local folder you wish to sync to: ")
+        if src_path[-1] != "/":
+            src_path = src_path + "/"
+        dst_path = input("Enter the absolute path of the remote folder to sync from: ")
+        if dst_path[-1] != "/":
+            dst_path = dst_path + "/"
+        personal_remote = input("Enter the name of your remote set in rclone: ")
+
+        profile_data = {
+            "src_path": src_path,
+            "dst_path": dst_path,
+            "personal_remote": personal_remote
+        }
+
+        #Save config
+        try:
+            with open(f"{CONFIG_DIR}/{profile_name}", "w") as file:
+                yaml.dump(profile_data, file)
+        except Exception as e:
+            print(f"{RED}Error: Unable to save profile.\n E: {e}{RESET}")
+            exit(126)
+
+        #Set active profile to new profile
+        set_active_profile(profile_name)
+
+    elif operation == "remove":
+        profile_name = input("Enter profile(name) to remove > ")
+        #Check if directory exists
+        if os.path.exists(f"{CONFIG_DIR}/{profile_name}"):
+            shutil.rmtree(f"{CONFIG_DIR}/{profile_name}")
+            print(f"{GREEN}Profile removed.{RESET}")
+        else:
+            print(f"{RED}The profile entered does not exist.{RESET}")
+    else:
+        print(f"{RED}Error, invalid parameter used in make_or_remove_profile{RESET}")
+        exit(128)
+
+
+def make_config():
+    print("Welcome to the cld tool!")
+    
+    #Variable declarations
     config_data = {}
     setup_rclone = ""
 
@@ -84,37 +138,12 @@ def make_config():
                 exit(126)
 
     #cld setup
+    print("Now, we will set up your first cld profile.")
     #Create CACHE directory if it does not exist
     if not os.path.exists(CACHE_DIR):
         os.mkdir(CACHE_DIR)
 
-    #Input from user
-    src_path = input("Enter the absolute path of the local folder you wish to sync to: ")
-    if src_path[-1] != "/":
-        src_path = src_path + "/"
-    dst_path = input("Enter the absolute path of the remote folder to sync from: ")
-    if dst_path[-1] != "/":
-        dst_path = dst_path + "/"
-    personal_remote = input("Enter the name of your remote set in rclone: ")
 
-    #Create config data
-    config_data = {
-        "src_path": src_path,
-        "dst_path": dst_path,
-        "personal_remote": personal_remote
-    }
-
-    #Create config directory
-    if not os.path.exists(CONFIG_DIR):
-        os.mkdir(CONFIG_DIR)
-    
-    #Save config
-    try:
-        with open(f"{CONFIG_DIR}/cld", "w") as file:
-            yaml.dump(config_data, file)
-    except Exception as e:
-        print(f"{RED}Error: Unable to save config.\n E: {e}{RESET}")
-        exit(126)
 
 def save_push_pull_dates(direction: str):
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
