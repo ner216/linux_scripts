@@ -49,7 +49,7 @@ def exit_codes():
 #Functions for configuration----------------------------------------------------------------------------
 def set_active_profile(profile_name: str) -> None:
     try:
-        with open(f"{CONFIG_DIR}/active_profile", "w") as file:
+        with open(f"{CONFIG_DIR}active_profile", "w") as file:
             file.write(profile_name)
     except Exception as e:
         print(f"{RED}Error, unable to save active profile.{RESET}")
@@ -59,13 +59,19 @@ def set_active_profile(profile_name: str) -> None:
 def get_active_profile() -> str:
     profile = ""
 
-    try:
-        with open(f"{CONFIG_DIR}/active_profile", "r") as file:
-            profile = file.read()
-            return profile
-    except Exception as e:
-        print(f"{RED}Error, unable to save active profile.{RESET}")
-        exit(128)
+    if os.path.exists(f"{CONFIG_DIR}active_profile"):
+        try:
+            with open(f"{CONFIG_DIR}active_profile", "r") as file:
+                profile = file.read()
+                return profile
+        except Exception as e:
+            print(f"{RED}Error, unable to get active profile.{RESET}")
+            exit(128)
+    else: #Run make_config if active config does not exist
+        print(f"{YELLOW}No active profile set!{RESET}")
+        profile = input("Enter profile to set active: ")
+        set_active_profile(profile)
+
 
 def display_profiles() -> None:
     print("Available profiles:")
@@ -74,14 +80,21 @@ def display_profiles() -> None:
             print(f" {profile}")
 
 def make_or_remove_profile(operation: str) -> None:
+    #Create CACHE and CONFIG directory if it does not exist
+    if not os.path.exists(CACHE_DIR):
+        os.mkdir(CACHE_DIR)
+    if not os.path.exists(CONFIG_DIR):
+        os.mkdir(CONFIG_DIR)
+
     #Variable declarations
     src_path = ""
     dst_path = ""
     personal_remote = ""
+    profile_name = " "
     
     if operation == "make":
         #Input from user
-        while " " not in profile_name:
+        while " " in profile_name:
             print("Enter the name for the new profile.")
             profile_name = input(f"{YELLOW} Note: profile name may not have spaces{RESET}\n > ")
         src_path = input("Enter the absolute path of the local folder you wish to sync to: ")
@@ -98,9 +111,9 @@ def make_or_remove_profile(operation: str) -> None:
             "personal_remote": personal_remote
         }
 
-        #Save config
+        #Save profile
         try:
-            with open(f"{CONFIG_DIR}/{profile_name}", "w") as file:
+            with open(f"{CONFIG_DIR}{profile_name}", "w") as file:
                 yaml.dump(profile_data, file)
         except Exception as e:
             print(f"{RED}Error: Unable to save profile.\n E: {e}{RESET}")
@@ -112,48 +125,14 @@ def make_or_remove_profile(operation: str) -> None:
     elif operation == "remove":
         profile_name = input("Enter profile(name) to remove > ")
         #Check if directory exists
-        if os.path.exists(f"{CONFIG_DIR}/{profile_name}"):
-            shutil.rmtree(f"{CONFIG_DIR}/{profile_name}")
+        if os.path.exists(f"{CONFIG_DIR}{profile_name}"):
+            os.remove(f"{CONFIG_DIR}{profile_name}")
             print(f"{GREEN}Profile removed.{RESET}")
         else:
             print(f"{RED}The profile entered does not exist.{RESET}")
     else:
         print(f"{RED}Error, invalid parameter used in make_or_remove_profile{RESET}")
         exit(128)
-
-
-def make_config():
-    print("Welcome to the cld tool!")
-    
-    #Variable declarations
-    setup_rclone = ""
-
-    #Prompt to setup Rclone before cld setup
-    print("Rclone must be configured before using cld.\nWould you like to configure it now?")
-    while setup_rclone != "y" and setup_rclone != "n":
-        setup_rclone = input("(y/n) > ")
-        if setup_rclone.lower() == "y":
-            try:
-                print(f"{GREEN}--> Rclone{RESET}")
-                rclone_present = shutil.which("rclone") is not None
-                if rclone_present == False:
-                    print(f"{RED}Error, Rclone could not be located in PATH. Is it installed?{RESET}")
-                    exit(127)
-                else:
-                    os.system("rclone config")
-            except subprocess.CalledProcessError as e:
-                print(f"{RED}Error: Unable to execute `rclone config`.\n E: {e}{RESET}")
-                exit(126)
-
-    #cld setup
-    #Create CACHE directory if it does not exist
-    if not os.path.exists(CACHE_DIR):
-        os.mkdir(CACHE_DIR)
-
-    #Make profile
-    make_profile = input("Would you like to make a new cld profile?\n (y/N) > ")
-    if make_profile == "y":
-        make_or_remove_profile("make")
 
 
 def save_push_pull_dates(direction: str):
@@ -206,7 +185,7 @@ def get_last_push_pull() -> dict:
     print(f"Last cld push: {YELLOW}{dates_data["last_push"]}{RESET}")
 
 
-def get_config() -> bool:
+def get_profile() -> bool:
     #Global variable declarations
     global global_src_path
     global global_dst_path 
@@ -344,7 +323,7 @@ def rclone_sync(direction: str, verbose: bool): #direction can be 'push' or 'pul
     result = ""
 
     #Print directory differences with respect to the directory being synced
-    print(f"{GREEN}ACTIVE PROFILE: {global_active_profile}")
+    print(f"{GREEN}ACTIVE PROFILE: {global_active_profile}{RESET}")
     print_changes(direction, verbose)
 
     if direction == "pull":
@@ -410,63 +389,93 @@ def rclone_sync(direction: str, verbose: bool): #direction can be 'push' or 'pul
 
 def main():
     #Variables
-    config_found = False
     flags = []
     true_flags = 0
 
-
-    #Load config values from config, get_config() returns a bool for config existance.
-    config_found = get_config() 
-    if config_found == False:
-        make_config()
-        exit(0)
-
     #Set up parser module with command arguments
     parser = argparse.ArgumentParser(description="cld script")
-    parser.add_argument("pull", action="store_true", help="Perform Rclone sync against the local system.")
-    parser.add_argument("push", action="store_true", help="Perform Rclone sync against remote.")
-    parser.add_argument("--set-config", action="store_true", help="Set new cld config.")
+
+    #Initialize parser arguments
+    parser.add_argument("--setup", action="store_true", help="Initial setup for cld.")
+    parser.add_argument("--pull", action="store_true", help="Perform Rclone sync against the local system.")
+    parser.add_argument("--push", action="store_true", help="Perform Rclone sync against remote.")
     parser.add_argument("--history", action="store_true", help="Show last pull or push dates.")
-    parser.add_argument("--delete-all-data", action="store_true", help="Delete all config and cache created by cld.")
+    parser.add_argument("--delete-all-data", action="store_true", help="Delete all profile and cache created by cld.")
     parser.add_argument("--codes", action="store_true", help="Show error code table.")
     parser.add_argument("--verbose", action="store_true", help="Show verbose output.")
     parser.add_argument("--profile", type=str, help="Run cld with a specific profile.")
     parser.add_argument("--set-profile", type=str, help="Set default profile.")
     parser.add_argument("--list-profiles", action="store_true", help="List available profiles.")
+    parser.add_argument("--add-profile", action="store_true", help="Create a new profile.")
+    parser.add_argument("--active-profile", action="store_true", help="View currently active profile")
+    parser.add_argument("--remove-profile", action="store_true", help="Remove a profile")
 
+    #Process arguments
     args = parser.parse_args()
+
     #Flags do not include verbose arg in total count as it can be used with all args
     flags = [
         args.pull, 
         args.push, 
-        args.reset_config, 
         args.history, 
         args.delete_all_data, 
         args.codes,
-        args.list_profile,
+        args.list_profiles,
+        args.add_profile,
+        args.remove_profile,
+        args.active_profile,
+        args.setup
     ]
     true_flags = sum(flags)
 
     if true_flags == 1:
-        if args.pull == True:
+        if args.setup == True:
+            make_or_remove_profile("make")
+        elif args.pull == True:
+            profile_found = get_profile() 
+            if profile_found == False:
+                print(f"{RED}Error, could not get current profile.{RESET}")
+                print(f"{YELLOW} If this is a fresh install of cld, run '--add-profile'{RESET}")
+                print(f"{YELLOW} Set a new profile with '--set-profile'.{RESET}")
+                exit(0)
             rclone_sync(direction="pull", verbose=args.verbose)
         elif args.push == True:
+            profile_found = get_profile() 
+            if profile_found == False:
+                print(f"{RED}Error, could not get current profile.{RESET}")
+                print(f"{YELLOW} If this is a fresh install of cld, run '--add-profile'{RESET}")
+                print(f"{YELLOW} Set a new profile with '--set-profile'.{RESET}")
+                exit(0)
             rclone_sync(direction="push", verbose=args.verbose)
-        elif args.set_config == True:
-            make_config()
+        elif args.active_profile == True:
+            profile_found = get_profile() 
+            if profile_found == False:
+                print(f"{RED}Error, could not get current profile.{RESET}")
+                print(f"{YELLOW} If this is a fresh install of cld, run '--add-profile'{RESET}")
+                print(f"{YELLOW} Set a new profile with '--set-profile'.{RESET}")
+                exit(0)
+            else:
+                print(f"Active Profile -> {global_active_profile}")
         elif args.delete_all_data == True:
             delete_all_data()
         elif args.history == True:
             get_last_push_pull()
         elif args.list_profiles == True:
             display_profiles()
+        elif args.add_profile == True:
+            make_or_remove_profile("make")
+        elif args.remove_profile == True:
+            display_profiles()
+            make_or_remove_profile("remove")
+        elif args.codes == True:
+            exit_codes()
         
     elif true_flags == 0:
         if args.set_profile != None:
             set_active_profile(args.set_profile)
     
     else:
-        print(f"{RED}Error, Invalid arguments used with cld.{RESET}")
+        print(f"{YELLOW}Invalid arguments used with cld. Run 'cld --help' for help.{RESET}")
         exit(2)
 
 
