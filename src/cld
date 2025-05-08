@@ -8,6 +8,7 @@ import sys
 import yaml
 import shutil
 import datetime
+import argparse
 
 #ANSI colors
 YELLOW = "\033[33m"
@@ -36,20 +37,10 @@ CONFIG_DIR = f"/home/{USER}/.config/cld/"
 global_personal_remote = ""
 
 #Functions for information messages---------------------------------------------------------------------
-def help():
-    print("*This command only takes one argument*\n")
-    print(" -Perform rclone sync against the remote: 'cld push'")
-    print(" -Perform rclone sync against the local system: 'cld pull'")
-    print(" -Reset/Create new config for cld: 'cld reset-config'")
-    print(" -Delete cld data from system: 'cld delete-all-data'")
-    print(" -Get last push and pull dates: 'hist' or 'history'")
-    print(" -Verbose: '-v' or 'verbose'")
-    print(" -exit codes: 'codes' or 'error-codes'")
-    print(" -Help: 'cld help'")
-
 def exit_codes():
     print("Exit codes for cld:")
     print("0 -- Command run successfully")
+    print("2 -- Invalid arguments")
     print("1 -- General error")
     print("126 -- Shell command could not be run")
     print("127 -- Shell command does not exist in PATH")
@@ -418,59 +409,65 @@ def rclone_sync(direction: str, verbose: bool): #direction can be 'push' or 'pul
 
 
 def main():
-    #Flag variables
-    push_arg = False
-    pull_arg = False
-    verbose_arg = False
-    delete_data_arg = False
-    reset_config_arg = False
-
+    #Variables
     config_found = False
+    flags = []
+    true_flags = 0
 
 
-    #Help argument possibility list
-    help_arg_list = ["help", "--help", "-h"]
-    verbose_arg_list = ["-v", "verbose", "--verbose"]
-
-    #Set flags based on arguments
-    for arg in sys.argv:
-        if arg == "pull":
-            pull_arg = True
-        if arg == "push":
-            push_arg = True
-        if arg in verbose_arg_list:
-            verbose_arg = True
-        if arg == "reset-config":
-            reset_config_arg = True
-        if arg == "delete-all-data":
-            delete_data_arg = True
-        if arg == "history" or arg == "hist":
-            get_last_push_pull()
-            exit(0)
-        if arg in help_arg_list:
-            help()
-            exit(0)
-        if arg == "codes" or arg == "error-codes":
-            exit_codes()
-            exit(0)
-    
     #Load config values from config, get_config() returns a bool for config existance.
     config_found = get_config() 
     if config_found == False:
         make_config()
         exit(0)
+
+    #Set up parser module with command arguments
+    parser = argparse.ArgumentParser(description="cld script")
+    parser.add_argument("pull", action="store_true", help="Perform Rclone sync against the local system.")
+    parser.add_argument("push", action="store_true", help="Perform Rclone sync against remote.")
+    parser.add_argument("--set-config", action="store_true", help="Set new cld config.")
+    parser.add_argument("--history", action="store_true", help="Show last pull or push dates.")
+    parser.add_argument("--delete-all-data", action="store_true", help="Delete all config and cache created by cld.")
+    parser.add_argument("--codes", action="store_true", help="Show error code table.")
+    parser.add_argument("--verbose", action="store_true", help="Show verbose output.")
+    parser.add_argument("--profile", type=str, help="Run cld with a specific profile.")
+    parser.add_argument("--set-profile", type=str, help="Set default profile.")
+    parser.add_argument("--list-profiles", action="store_true", help="List available profiles.")
+
+    args = parser.parse_args()
+    #Flags do not include verbose arg in total count as it can be used with all args
+    flags = [
+        args.pull, 
+        args.push, 
+        args.reset_config, 
+        args.history, 
+        args.delete_all_data, 
+        args.codes,
+        args.list_profile,
+    ]
+    true_flags = sum(flags)
+
+    if true_flags == 1:
+        if args.pull == True:
+            rclone_sync(direction="pull", verbose=args.verbose)
+        elif args.push == True:
+            rclone_sync(direction="push", verbose=args.verbose)
+        elif args.set_config == True:
+            make_config()
+        elif args.delete_all_data == True:
+            delete_all_data()
+        elif args.history == True:
+            get_last_push_pull()
+        elif args.list_profiles == True:
+            display_profiles()
+        
+    elif true_flags == 0:
+        if args.set_profile != None:
+            set_active_profile(args.set_profile)
     
-    #Run command based on arguments
-    if push_arg == True:
-        rclone_sync(direction="push", verbose=verbose_arg)
-    elif pull_arg == True:
-        rclone_sync(direction="pull", verbose=verbose_arg)
-    elif reset_config_arg == True:
-        make_config()
-    elif delete_data_arg == True:
-        delete_all_data()
     else:
-        help()
+        print(f"{RED}Error, Invalid arguments used with cld.{RESET}")
+        exit(2)
 
 
 main()
