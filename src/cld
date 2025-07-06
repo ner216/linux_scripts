@@ -9,6 +9,7 @@ import yaml
 import shutil
 import datetime
 import argparse
+import time
 
 #ANSI colors
 YELLOW = "\033[33m"
@@ -79,6 +80,7 @@ def display_profiles() -> None:
         if "active_profile" not in profile:
             print(f" {profile}")
 
+
 def make_or_remove_profile(operation: str) -> None:
     #Create CACHE and CONFIG directory if it does not exist
     if not os.path.exists(CACHE_DIR):
@@ -136,8 +138,10 @@ def make_or_remove_profile(operation: str) -> None:
 
 
 def save_push_pull_dates(direction: str):
+    # Get human readable timestamp
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-    dates_data = {}
+    # Get time in epoch
+    system_time_epoch = int(time.time())
 
     #load timestamp file if it exists
     if os.path.exists(f"{CACHE_DIR}/timestamp"):
@@ -146,14 +150,18 @@ def save_push_pull_dates(direction: str):
     else:
         dates_data = {
             "last_pull": None,
-            "last_push": None
+            "last_push": None,
+            "last_pull_epoch": None,
+            "last_push_epoch": None
         }
 
     #Set new date
     if direction == "pull":
         dates_data["last_pull"] = current_time
+        dates_data["last_pull_epoch"] = system_time_epoch
     elif direction == "push":
         dates_data["last_push"] = current_time
+        dates_data["last_push_epoch"] = system_time_epoch
     else:
         print(f"{RED}Error, Invalid parameter sent to `save_push_pull_dates`\n Param sent: {direction}{RESET}")
         exit(128)
@@ -167,6 +175,7 @@ def save_push_pull_dates(direction: str):
         exit(126)
 
 
+# Get function that returns history push and pull data
 def get_last_push_pull() -> dict:
     dates_data = {}
 
@@ -177,12 +186,75 @@ def get_last_push_pull() -> dict:
     else:
         dates_data = {
             "last_pull": None,
-            "last_push": None
+            "last_push": None,
+            "last_pull_epoch": None,
+            "last_push_epoch": None
         }
 
+    return dates_data
+
+
+# Print human readable dates for the last push and pull
+def print_last_push_pull() -> None:
+    dates_data = get_last_push_pull()
+   
     #Display data
     print(f"Last cld pull: {YELLOW}{dates_data["last_pull"]}{RESET}")
     print(f"Last cld push: {YELLOW}{dates_data["last_push"]}{RESET}")
+
+
+# Walk local file sync recursively to find file mod dates
+def get_local_mod_dates() -> dict:
+    local_mod_data = {}
+    for root, dirs, files in os.walk(global_src_path):
+        # root is the current directory path
+        # dirs is the list of subdirectory names
+        # files is the list of file names in the current directory
+
+        for file in files:
+            local_mod_data[file] = os.path.getmtime(f"{root}/{file}")
+    
+    return local_mod_data
+
+
+# Print status of files since last push or pull
+def status() -> None:
+    # Get past dates of last push and pull
+    history_dates_data = get_last_push_pull() 
+    # Get current file modification dates
+    local_dates_data = get_local_mod_dates()
+    # Store file names that have been modified
+    modified_files_since_pull = []
+    modified_files_since_push = []
+    combined_files = []
+
+
+    local_filenames = local_dates_data.keys()
+    for file in local_filenames:
+        if history_dates_data["last_pull_epoch"]:
+            if local_dates_data[file] > history_dates_data["last_pull_epoch"]:
+                modified_files_since_pull.append(file)
+                combined_files.append(file)
+        if history_dates_data["last_push_epoch"]:
+            if local_dates_data[file] > history_dates_data["last_push_epoch"]:
+                modified_files_since_push.append(file)
+                combined_files.append(file)
+
+    # Remove duplicate entries in combined_files.
+    combined_files = list(set(combined_files))
+
+    # Check that all files appear in both lists
+    for file in combined_files:
+        if file not in modified_files_since_pull or file not in modified_files_since_push:
+            combined_files.remove(file)
+
+    if len(combined_files) > 0:
+        print("\nFiles that have been changed since last push/pull:")
+        for file in combined_files:
+            print(f" {YELLOW}** {file}{RESET}")
+        print("\n")
+    else:
+        print(f"{GREEN}All files are up to date!{RESET}")
 
 
 def get_profile() -> bool:
@@ -219,6 +291,7 @@ def delete_all_data():
     except Exception as e:
         print(f"{RED}Error, Unable to delete data.\n E: {e}{RESET}")
         exit(126)
+
 
 #Functions for one-way syncing--------------------------------------------------------
 #Get and print changes that will be made to files if rclone sync is used   
@@ -399,6 +472,7 @@ def main():
     parser.add_argument("--setup", action="store_true", help="Initial setup for cld.")
     parser.add_argument("--pull", action="store_true", help="Perform Rclone sync against the local system.")
     parser.add_argument("--push", action="store_true", help="Perform Rclone sync against remote.")
+    parser.add_argument("--status", action="store_true", help="Show files updated since last push/pull.")
     parser.add_argument("--history", action="store_true", help="Show last pull or push dates.")
     parser.add_argument("--delete-all-data", action="store_true", help="Delete all profile and cache created by cld.")
     parser.add_argument("--codes", action="store_true", help="Show error code table.")
@@ -424,7 +498,8 @@ def main():
         args.add_profile,
         args.remove_profile,
         args.active_profile,
-        args.setup
+        args.setup,
+        args.status
     ]
     true_flags = sum(flags)
 
@@ -459,7 +534,7 @@ def main():
         elif args.delete_all_data == True:
             delete_all_data()
         elif args.history == True:
-            get_last_push_pull()
+            print_last_push_pull()
         elif args.list_profiles == True:
             display_profiles()
         elif args.add_profile == True:
@@ -467,6 +542,15 @@ def main():
         elif args.remove_profile == True:
             display_profiles()
             make_or_remove_profile("remove")
+        elif args.status == True:
+            profile_found = get_profile() 
+            if profile_found == False:
+                print(f"{RED}Error, could not get current profile.{RESET}")
+                print(f"{YELLOW} If this is a fresh install of cld, run '--add-profile'{RESET}")
+                print(f"{YELLOW} Set a new profile with '--set-profile'.{RESET}")
+                exit(0)
+            else:
+                status()
         elif args.codes == True:
             exit_codes()
         
