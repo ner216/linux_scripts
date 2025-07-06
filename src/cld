@@ -138,6 +138,7 @@ def make_or_remove_profile(operation: str) -> None:
 
 
 def save_push_pull_dates(direction: str):
+    # Section for timestamp file handling
     # Get human readable timestamp
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
     # Get time in epoch
@@ -172,6 +173,22 @@ def save_push_pull_dates(direction: str):
             yaml.dump(dates_data, file)
     except Exception as e:
         print(f"{RED}Error, Unable to save time data.\n E: {e}{RESET}")
+        exit(126)
+
+    #Section for moddate file handling
+    #load moddate file if it exists
+    if os.path.exists(f"{CACHE_DIR}/moddate"):
+        with open(f"{CACHE_DIR}/moddate","r") as file:
+            last_mod_dates = yaml.safe_load(file)
+    else:
+        last_mod_dates = get_local_mod_dates()
+
+    #Save moddate file
+    try:
+        with open(f"{CACHE_DIR}/moddate", "w") as file:
+            yaml.dump(last_mod_dates, file)
+    except Exception as e:
+        print(f"{RED}Error, Unable to save mod date data.[cld::save_push_pull_dates]\n E: {e}{RESET}")
         exit(126)
 
 
@@ -223,35 +240,47 @@ def status() -> None:
     history_dates_data = get_last_push_pull() 
     # Get current file modification dates
     local_dates_data = get_local_mod_dates()
-    # Store file names that have been modified
-    modified_files_since_pull = []
-    modified_files_since_push = []
-    combined_files = []
+    # Get the most recent push or pull epoch date
+    last_pull_or_push_epoch = 0
+    last_pull_or_push_stamp = ""
+    if history_dates_data["last_pull_epoch"] >= history_dates_data["last_push_epoch"]:
+        last_pull_or_push_epoch = history_dates_data["last_pull_epoch"]
+        last_pull_or_push_stamp = history_dates_data["last_pull"]
+    elif history_dates_data["last_push_epoch"] >= history_dates_data["last_pull_epoch"]:
+        last_pull_or_push_epoch = history_dates_data["last_push_epoch"]
+        last_pull_or_push_stamp = history_dates_data["last_push"]
+    else:
+        print(f"Err: last push and pull epoch dates are invalid! [cld::status]")
+        exit(1)
 
+    # Store file names that have been modified
+    modified_file_list = {}
 
     local_filenames = local_dates_data.keys()
     for file in local_filenames:
-        if history_dates_data["last_pull_epoch"]:
-            if local_dates_data[file] > history_dates_data["last_pull_epoch"]:
-                modified_files_since_pull.append(file)
-                combined_files.append(file)
-        if history_dates_data["last_push_epoch"]:
-            if local_dates_data[file] > history_dates_data["last_push_epoch"]:
-                modified_files_since_push.append(file)
-                combined_files.append(file)
+        if local_dates_data[file] > last_pull_or_push_epoch:
+            modified_file_list[file] = "MOD"
 
-    # Remove duplicate entries in combined_files.
-    combined_files = list(set(combined_files))
+    # Load moddate file to find deleted files
+    last_mod_dates = {}
+    if os.path.exists(f"{CACHE_DIR}/moddate"):
+        with open(f"{CACHE_DIR}/moddate","r") as file:
+            last_mod_dates = yaml.safe_load(file)
+    
+    # Loop through moddate file to check for files that no longer exist
+    for file in last_mod_dates.keys():
+        if file not in local_dates_data.keys():
+            modified_file_list[file] = "DEL"
 
-    # Check that all files appear in both lists
-    for file in combined_files:
-        if file not in modified_files_since_pull or file not in modified_files_since_push:
-            combined_files.remove(file)
-
-    if len(combined_files) > 0:
-        print("\nFiles that have been changed since last push/pull:")
-        for file in combined_files:
-            print(f" {YELLOW}** {file}{RESET}")
+    # Print modified files
+    if len(modified_file_list) > 0:
+        print(f"\nLast push/pull date: {last_pull_or_push_stamp}")
+        print(f"Files that have been {YELLOW}modified{RESET}/{RED}removed{RESET} since last push/pull:")
+        for file in modified_file_list.keys():
+            if modified_file_list[file] == "MOD":
+                print(f" {YELLOW}** {file}{RESET}")
+            elif modified_file_list[file] == "DEL":
+                print(f" {RED}-- {file}{RESET}")
         print("\n")
     else:
         print(f"{GREEN}All files are up to date!{RESET}")
