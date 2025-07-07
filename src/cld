@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# REQUIRES PYTHON VERSION >3.12
+
 #Interactive scipt to manage Rclone sync
 
 import os
@@ -36,6 +38,26 @@ CONFIG_DIR = f"/home/{USER}/.config/cld/"
 #REMOTES
 #Personal Google drive remote name
 global_personal_remote = ""
+
+
+# Check if the python interpreter being used is tested
+def check_py_version() -> None:
+    # Flag variables
+    supported_flag = False
+    
+    supported_versions = ["3.12"]
+    version_info = sys.version.split() # index 0 is python version, 1 is install date, 2 is GCC version info.
+    py_version = version_info[0] # Get python interpreter version
+
+    for version in supported_versions:
+        if version in py_version:
+            supported_flag = True
+            break
+    
+    if supported_flag == False:
+        print(f"{YELLOW}Warning:{RESET} Using untested python version: {py_version}")
+        print(f" -> Supported Python versions: {supported_versions}")
+
 
 #Functions for information messages---------------------------------------------------------------------
 def exit_codes():
@@ -510,6 +532,9 @@ def rclone_sync(direction: str, verbose: bool): #direction can be 'push' or 'pul
 
 
 def main():
+    # Check if Python interpreter version is supported
+    check_py_version()
+
     #Variables
     flags = []
     true_flags = 0
