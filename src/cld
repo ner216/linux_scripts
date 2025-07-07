@@ -121,6 +121,12 @@ def make_or_remove_profile(operation: str) -> None:
             print(f"{RED}Error: Unable to save profile.\n E: {e}{RESET}")
             exit(126)
 
+        try:
+            os.mkdir(f"{CACHE_DIR}{profile_name}")
+        except Exception as e:
+            print(f"{RED}Error: Unable to create cache folder.\n E: {e}{RESET}")
+            exit(126)
+
         #Set active profile to new profile
         set_active_profile(profile_name)
 
@@ -138,6 +144,14 @@ def make_or_remove_profile(operation: str) -> None:
 
 
 def save_push_pull_dates(direction: str):
+    # Get active profile
+    try:
+        active_profile = get_active_profile()
+        print(f"{GREEN}ACTIVE PROFILE: {global_active_profile}{RESET}")
+    except Exception as e:
+        print(f"FATAL: Unable to fetch active profile! [cld::save_push_pull_dates]\n Err: {e}")
+        exit(1)
+
     # Section for timestamp file handling
     # Get human readable timestamp
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
@@ -145,8 +159,8 @@ def save_push_pull_dates(direction: str):
     system_time_epoch = int(time.time())
 
     #load timestamp file if it exists
-    if os.path.exists(f"{CACHE_DIR}/timestamp"):
-        with open(f"{CACHE_DIR}/timestamp","r") as file:
+    if os.path.exists(f"{CACHE_DIR}/{get_active_profile()}/timestamp"):
+        with open(f"{CACHE_DIR}/{get_active_profile()}/timestamp","r") as file:
             dates_data = yaml.safe_load(file)
     else:
         dates_data = {
@@ -169,7 +183,7 @@ def save_push_pull_dates(direction: str):
 
     #Save timestamp file
     try:
-        with open(f"{CACHE_DIR}/timestamp", "w") as file:
+        with open(f"{CACHE_DIR}/{active_profile}/timestamp", "w") as file:
             yaml.dump(dates_data, file)
     except Exception as e:
         print(f"{RED}Error, Unable to save time data.\n E: {e}{RESET}")
@@ -177,15 +191,15 @@ def save_push_pull_dates(direction: str):
 
     #Section for moddate file handling
     #load moddate file if it exists
-    if os.path.exists(f"{CACHE_DIR}/moddate"):
-        with open(f"{CACHE_DIR}/moddate","r") as file:
+    if os.path.exists(f"{CACHE_DIR}/{active_profile}/moddate"):
+        with open(f"{CACHE_DIR}/{get_active_profile()}/moddate","r") as file:
             last_mod_dates = yaml.safe_load(file)
     else:
         last_mod_dates = get_local_mod_dates()
 
     #Save moddate file
     try:
-        with open(f"{CACHE_DIR}/moddate", "w") as file:
+        with open(f"{CACHE_DIR}/{active_profile}/moddate", "w") as file:
             yaml.dump(last_mod_dates, file)
     except Exception as e:
         print(f"{RED}Error, Unable to save mod date data.[cld::save_push_pull_dates]\n E: {e}{RESET}")
@@ -194,11 +208,17 @@ def save_push_pull_dates(direction: str):
 
 # Get function that returns history push and pull data
 def get_last_push_pull() -> dict:
+    # Get active profile
+    try:
+        active_profile = get_active_profile()
+    except Exception as e:
+        print(f"FATAL: Unable to fetch active profile! [cld::get_last_push_pull]\n Err: {e}")
+        exit(1)
     dates_data = {}
 
     #Get time data from file
-    if os.path.exists(f"{CACHE_DIR}/timestamp"):
-        with open(f"{CACHE_DIR}/timestamp", "r") as file:
+    if os.path.exists(f"{CACHE_DIR}/{active_profile}/timestamp"):
+        with open(f"{CACHE_DIR}/{active_profile}/timestamp", "r") as file:
             dates_data = yaml.safe_load(file)
     else:
         dates_data = {
@@ -506,7 +526,6 @@ def main():
     parser.add_argument("--delete-all-data", action="store_true", help="Delete all profile and cache created by cld.")
     parser.add_argument("--codes", action="store_true", help="Show error code table.")
     parser.add_argument("--verbose", action="store_true", help="Show verbose output.")
-    parser.add_argument("--profile", type=str, help="Run cld with a specific profile.")
     parser.add_argument("--set-profile", type=str, help="Set default profile.")
     parser.add_argument("--list-profiles", action="store_true", help="List available profiles.")
     parser.add_argument("--add-profile", action="store_true", help="Create a new profile.")
