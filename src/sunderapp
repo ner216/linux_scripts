@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+
+import subprocess
+import os
+import argparse
+import shutil
+
+
+# Get user running script
+SUDOER = os.environ.get('SUDO_USER')
+USER = os.getlogin()
+# Exit if user not sudo
+if not SUDOER or USER == "root":
+    print("Script must be run as root!")
+    exit()
+
+
+# Constants
+CACHE_DIR = f"/home/{USER}/.cache/sunderapp/"
+DOCKER_IMAGE_TAG = "sunderapp"
+
+
+# Logic for managing dependancies
+def depend_check() -> None:
+    # Nested functions for depend_check()
+    # Try to read /etc/os-release (standard for modern Linux)
+    def check_distro() -> str:
+        if os.path.exists("/etc/os-release"):
+            with open("/etc/os-release", "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("ID="):
+                        dist_id = line.split("=")[1].strip('"')
+            return dist_id
+
+
+    # Install dependancies for Ubuntu
+    def install_ubuntu_depend(curl:bool, nxagent:bool, docker:bool, x11docker:bool) -> None:
+        APT_UPDATE = "apt update -y"
+        INSTALL_CURL = "apt install curl -y"
+        INSTALL_NXAGENT = "apt install nxagent -y"
+        INSTALL_DOCKER = "snap install docker"
+        INSTALL_X11DOCKER = "curl -fsSL https://raw.githubusercontent.com/mviereck/x11docker/master/x11docker | sudo bash -s -- --update"
+
+        # Update apt
+        print("--> Updating apt...")
+        try:
+            os.system(APT_UPDATE)
+        except Exception as e:
+            print(f"[Err] Unable to update apt. [install_ubuntu_depend]\n Err: {e}")
+            exit(1)
+
+        # install curl
+        if curl == False:
+            print("--> Installing curl...")
+            try:
+                os.system(INSTALL_CURL)
+                print("Successfully installed curl!")
+            except Exception as e:
+                print(f"[Err] Unable to install curl. [install_ubuntu_depend]\n Err: {e}")
+
+        if nxagent == False:
+            print("--> Installing nxagent...")
+            try:
+                os.system(INSTALL_NXAGENT)
+                print("Successfully installed nxagent!")
+            except Exception as e:
+                print(f"[Err] Unable to install nxagent. [install_ubuntu_depend]\n Err: {e}")
+
+        if docker == False:
+            print("--> Installing docker...")
+            try:
+                os.system(INSTALL_DOCKER)
+                print("Successfully installed docker!")
+            except Exception as e:
+                print(f"[Err] Unable to install docker. [install_ubuntu_depend]\n Err: {e}")
+
+        if x11docker == False:
+            print("--> Installing x11docker...")
+            try:
+                os.system(INSTALL_X11DOCKER)
+                print("Successfully installed x11docker!")
+            except Exception as e:
+                print(f"[Err] Unable to install x11docker. [install_ubuntu_depend]\n Err: {e}")
+    
+    # Check if the docker image is already created
+    def check_docker_image() -> bool:
+        check_img_command = f"docker image ls | cut --delimeter=' ' --fields=1 | grep {DOCKER_IMAGE_TAG}"
+        test_img_result = subprocess.run(
+            check_img_command, 
+            capture_output=True, 
+            text=True,
+            shell=True,
+            )
+        if test_img_result.stdout != DOCKER_IMAGE_TAG:
+            setup_docker_image()
+
+    # End of nested functions
+    SUPPORTED_DISTROS = ["ubuntu"]
+    distro_id = check_distro()
+
+    # Quit if the distro is not supported
+    if distro_id.lower() not in SUPPORTED_DISTROS:
+        print(f"[Err] This distrobution is not supported.\nSupported: {SUPPORTED_DISTROS}")
+        exit(1)
+
+    # Test commands
+    test_curl = "which curl"
+    test_nxagent = "which nxagent"
+    test_x11docker = "which x11docker"
+    test_docker = "which docker"
+    # Flag variables
+    curl_status = True
+    nxagent_status = True
+    x11docker_status = True
+    docker_status = True
+
+    # Run which commands to check for command existance
+    test_curl_result = subprocess.run(
+        test_curl, 
+        capture_output=True, 
+        text=True,
+        shell=True,
+        )
+    
+    test_nxagent_result = subprocess.run(
+        test_nxagent, 
+        capture_output=True, 
+        text=True,
+        shell=True,
+        )
+    
+    test_docker_result = subprocess.run(
+        test_docker, 
+        capture_output=True, 
+        text=True,
+        shell=True,
+        )
+    
+    test_x11docker_result = subprocess.run(
+        test_x11docker, 
+        capture_output=True, 
+        text=True,
+        shell=True,
+        )
+    
+    # Set flag variables based on return codes
+    if test_curl_result.returncode != 0:
+        curl_status = False
+    if test_nxagent_result.returncode != 0:
+        nxagent_status = False
+    if test_docker_result.returncode != 0:
+        docker_status = False
+    if test_x11docker_result.returncode != 0:
+        x11docker_status = False
+
+    if curl_status == False or x11docker_status == False or docker_status == False:
+        print("sunderapp requires the following dependancies:")
+        print("  docker\n  x11docker\n  curl")
+        install_choice = input("Would you like to install missing dependencies? (y/N) > ")
+        if install_choice.lower() == "y":
+            install_ubuntu_depend(curl_status, nxagent_status, docker_status, x11docker_status)
+
+    # Check for existance of docker image
+    check_docker_image()
+        
+
+# Use docker build to create the docker image
+# Can be called by depend_check() or main()
+def setup_docker_image() -> None:
+    # Constants
+    DOCKER_BUILD = f"docker build -t {DOCKER_IMAGE_TAG} {CACHE_DIR}"
+
+    # Nested function for writing the dockerfile
+    def create_docker_file():
+        os.system(f"echo 'FROM ubuntu:24.04' > {CACHE_DIR}dockerfile")
+        os.system(f"echo 'RUN apt update -y' >> {CACHE_DIR}dockerfile")
+        os.system(f"echo 'RUN apt upgrade -y' >> {CACHE_DIR}dockerfile")
+        os.system(f"echo 'RUN apt install evince -y' >> {CACHE_DIR}dockerfile")
+        
+
+    #Create CACHE and CONFIG directory if it does not exist
+    if not os.path.exists(CACHE_DIR):
+        os.mkdir(CACHE_DIR)
+    
+    if not os.path.exists(f"{CACHE_DIR}dockerfile"):
+        configure_docker = input("Would you like to configure the docker container? (y/N) > ")
+        if configure_docker.lower() == "y":
+            try:
+                create_docker_file()
+                os.system(DOCKER_BUILD)
+            except Exception as e:
+                print(f"[Err] Unable to configure docker [setup_docker_image]\nErr: {e}")
+                exit(1)
+        else:
+            print("Exiting...")
+            exit(0)
+
+
+# Logic for deleting app cache and dependancies
+# Called by main()
+def purge_app() -> None:
+    apt_purge_command = "apt purge nxagent curl -y"
+    apt_autoremove_command = "apt autoremove"
+    apt_clean_command = "apt clean"
+
+    try:
+        print("Deleting cache files:")
+        if os.path.exists(CACHE_DIR):
+            shutil.rmtree(CACHE_DIR)
+            print("Deleted cache files.")
+    except Exception as e:
+        print(f"[Err] Unable to remove cache [purge_app]\nErr: {e}")
+        exit(1)
+
+    print("Deleting dependancies with apt:")
+    try:
+        os.system(apt_purge_command)
+        os.system(apt_autoremove_command)
+        os.system(apt_clean_command)
+    except Exception as e:
+        print(f"[Err] Unable to remove dependencies [purge_app]\nErr: {e}")
+        exit(1)
+    
+
+# Function for opening a pdf file with x11docker
+def open_pdf_file(path:str, verbose:bool):
+    # Check for dependancies before running application
+    depend_check()
+    x11docker_command = f"x11docker --nxagent {DOCKER_IMAGE_TAG} --clipboard --share {path}:ro evince {path}"
+
+    # Run docker command and capture output
+    print("Running PDF viewer Evince...")
+    x11docker_command_result = subprocess.run(
+        x11docker_command, 
+        capture_output=True, 
+        text=True,
+        shell=True,
+        )
+    
+    if verbose == True:
+        if len(x11docker_command_result.stdout) != 0:
+            print(x11docker_command_result.stdout)
+        if len(x11docker_command_result.stderr) != 0:
+            print(" --> X11DOCKER ERRORS:")
+            print(x11docker_command_result.stderr)
+
+
+def main():
+    # Flag variables
+    verbose_flag = False
+
+    #Set up parser module with command arguments
+    parser = argparse.ArgumentParser(description="sunderapp script")
+
+    #Initialize parser arguments
+    parser.add_argument("--pdf", type=str, help="Specify path for a pdf file to pass.")
+    parser.add_argument("--setup", action="store_true", help="Setup sunderapp.")
+    parser.add_argument("--purge", action="store_true", help="Remove all data and dependancies.")
+    parser.add_argument("-v", action="store_true", help="Enable verbose output.")
+
+
+
+    args = parser.parse_args()
+    
+    if args.v == True:
+        verbose_flag = True
+
+    if args.setup == True:
+        try:
+            depend_check()
+        except Exception as e:
+            print(f"[Err] Unable to setup dependancies [main]\nErr: {e}")
+            exit(1)
+        try:
+            setup_docker_image()
+        except Exception as e:
+            print(f"[Err] Unable to setup dependancies [main]\nErr: {e}")
+            exit(1)
+    elif args.purge == True:
+        print("Warning: app purge functionality not yet tested on this version of sunderapp!")
+        choice = input("Are you sure you would like to delete all data? (y/N) > ")
+        if choice.lower() == "y":
+            purge_app()
+    elif args.pdf != None:
+        open_pdf_file(args.pdf, verbose_flag)
+
+
+main()
