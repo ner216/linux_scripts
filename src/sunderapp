@@ -20,6 +20,54 @@ CACHE_DIR = f"/home/{USER}/.cache/sunderapp/"
 DOCKER_IMAGE_TAG = "sunderapp"
 
 
+# Use docker build to create the docker image
+# Can be called by depend_check() or main()
+# SYNOPSIS: Will create a dockerfile and/or docker image if not currently present
+def check_or_setup_docker_image() -> None:
+    # Constants
+    DOCKER_BUILD = f"docker build -t {DOCKER_IMAGE_TAG} {CACHE_DIR}"
+
+    # Nested function for writing the dockerfile
+    def create_docker_file():
+        os.system(f"echo 'FROM ubuntu:24.04' > {CACHE_DIR}dockerfile")
+        os.system(f"echo 'RUN apt update -y' >> {CACHE_DIR}dockerfile")
+        os.system(f"echo 'RUN apt upgrade -y' >> {CACHE_DIR}dockerfile")
+        os.system(f"echo 'RUN apt install evince -y' >> {CACHE_DIR}dockerfile")
+        
+
+    #Create CACHE and CONFIG directory if it does not exist
+    if not os.path.exists(CACHE_DIR):
+        os.mkdir(CACHE_DIR)
+    
+    if not os.path.exists(f"{CACHE_DIR}dockerfile"): # Create docker file if it does not exist
+        configure_docker = input("Would you like to configure the docker container? (y/N) > ")
+        if configure_docker.lower() == "y":
+            try:
+                create_docker_file()
+                os.system(DOCKER_BUILD)
+            except Exception as e:
+                print(f"[Err] Unable to configure docker [setup_docker_image]\nErr: {e}")
+                exit(1)
+        else:
+            print("Exiting...")
+            exit(0)
+    else: # Create docker image if it does not exist
+        check_img_command = f"docker image ls | cut --delimiter=' ' --fields=1 | grep {DOCKER_IMAGE_TAG}"
+        test_img_result = subprocess.run(
+            check_img_command, 
+            capture_output=True, 
+            text=True,
+            shell=True,
+            )
+        if test_img_result.returncode != 0:
+            build_image = input("Sunderapp docker image not found. Would you like to build it? (y/N) > ")
+            if build_image.lower() == "y":
+                    os.system(DOCKER_BUILD)
+            else:
+                print("Exiting...")
+                exit(0)
+
+
 # Logic for managing dependancies
 def depend_check() -> None:
     # Nested functions for depend_check()
@@ -82,23 +130,12 @@ def depend_check() -> None:
                 print("Successfully installed x11docker!")
             except Exception as e:
                 print(f"[Err] Unable to install x11docker. [install_ubuntu_depend]\n Err: {e}")
-    
-    # Check if the docker image is already created
-    def check_docker_image() -> bool:
-        check_img_command = f"docker image ls | cut --delimeter=' ' --fields=1 | grep {DOCKER_IMAGE_TAG}"
-        test_img_result = subprocess.run(
-            check_img_command, 
-            capture_output=True, 
-            text=True,
-            shell=True,
-            )
-        if test_img_result.stdout != DOCKER_IMAGE_TAG:
-            setup_docker_image()
 
+    
     # End of nested functions
     SUPPORTED_DISTROS = ["ubuntu"]
     distro_id = check_distro()
-
+    
     # Quit if the distro is not supported
     if distro_id.lower() not in SUPPORTED_DISTROS:
         print(f"[Err] This distrobution is not supported.\nSupported: {SUPPORTED_DISTROS}")
@@ -160,41 +197,6 @@ def depend_check() -> None:
         install_choice = input("Would you like to install missing dependencies? (y/N) > ")
         if install_choice.lower() == "y":
             install_ubuntu_depend(curl_status, nxagent_status, docker_status, x11docker_status)
-
-    # Check for existance of docker image
-    check_docker_image()
-        
-
-# Use docker build to create the docker image
-# Can be called by depend_check() or main()
-def setup_docker_image() -> None:
-    # Constants
-    DOCKER_BUILD = f"docker build -t {DOCKER_IMAGE_TAG} {CACHE_DIR}"
-
-    # Nested function for writing the dockerfile
-    def create_docker_file():
-        os.system(f"echo 'FROM ubuntu:24.04' > {CACHE_DIR}dockerfile")
-        os.system(f"echo 'RUN apt update -y' >> {CACHE_DIR}dockerfile")
-        os.system(f"echo 'RUN apt upgrade -y' >> {CACHE_DIR}dockerfile")
-        os.system(f"echo 'RUN apt install evince -y' >> {CACHE_DIR}dockerfile")
-        
-
-    #Create CACHE and CONFIG directory if it does not exist
-    if not os.path.exists(CACHE_DIR):
-        os.mkdir(CACHE_DIR)
-    
-    if not os.path.exists(f"{CACHE_DIR}dockerfile"):
-        configure_docker = input("Would you like to configure the docker container? (y/N) > ")
-        if configure_docker.lower() == "y":
-            try:
-                create_docker_file()
-                os.system(DOCKER_BUILD)
-            except Exception as e:
-                print(f"[Err] Unable to configure docker [setup_docker_image]\nErr: {e}")
-                exit(1)
-        else:
-            print("Exiting...")
-            exit(0)
 
 
 # Logic for deleting app cache and dependancies
@@ -259,8 +261,6 @@ def main():
     parser.add_argument("--purge", action="store_true", help="Remove all data and dependancies.")
     parser.add_argument("-v", action="store_true", help="Enable verbose output.")
 
-
-
     args = parser.parse_args()
     
     if args.v == True:
@@ -273,7 +273,7 @@ def main():
             print(f"[Err] Unable to setup dependancies [main]\nErr: {e}")
             exit(1)
         try:
-            setup_docker_image()
+            check_or_setup_docker_image()
         except Exception as e:
             print(f"[Err] Unable to setup dependancies [main]\nErr: {e}")
             exit(1)
@@ -283,6 +283,7 @@ def main():
         if choice.lower() == "y":
             purge_app()
     elif args.pdf != None:
+        check_or_setup_docker_image()
         open_pdf_file(args.pdf, verbose_flag)
 
 
