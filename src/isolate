@@ -16,8 +16,8 @@ if not SUDOER or USER == "root":
 
 
 # Constants
-CACHE_DIR = f"/home/{USER}/.cache/sunderapp/"
-DOCKER_IMAGE_TAG = "sunderapp"
+CACHE_DIR = f"/home/{USER}/.cache/isolate/"
+DOCKER_IMAGE_TAG = "isolate"
 
 
 # Use docker build to create the docker image
@@ -60,7 +60,7 @@ def check_or_setup_docker_image() -> None:
             shell=True,
             )
         if test_img_result.returncode != 0:
-            build_image = input("Sunderapp docker image not found. Would you like to build it? (y/N) > ")
+            build_image = input("isolate docker image not found. Would you like to build it? (y/N) > ")
             if build_image.lower() == "y":
                     os.system(DOCKER_BUILD)
             else:
@@ -192,7 +192,7 @@ def depend_check() -> None:
         x11docker_status = False
 
     if curl_status == False or x11docker_status == False or docker_status == False:
-        print("sunderapp requires the following dependancies:")
+        print("isolate requires the following dependancies:")
         print("  docker\n  x11docker\n  curl")
         install_choice = input("Would you like to install missing dependencies? (y/N) > ")
         if install_choice.lower() == "y":
@@ -253,11 +253,11 @@ def main():
     verbose_flag = False
 
     #Set up parser module with command arguments
-    parser = argparse.ArgumentParser(description="sunderapp script")
+    parser = argparse.ArgumentParser(description="isolate script")
 
     #Initialize parser arguments
     parser.add_argument("--pdf", type=str, help="Specify path for a pdf file to pass.")
-    parser.add_argument("--setup", action="store_true", help="Setup sunderapp.")
+    parser.add_argument("--setup", action="store_true", help="Setup isolate.")
     parser.add_argument("--purge", action="store_true", help="Remove all data and dependancies.")
     parser.add_argument("-v", action="store_true", help="Enable verbose output.")
 
@@ -278,7 +278,7 @@ def main():
             print(f"[Err] Unable to setup dependancies [main]\nErr: {e}")
             exit(1)
     elif args.purge == True:
-        print("Warning: app purge functionality not yet tested on this version of sunderapp!")
+        print("Warning: app purge functionality not yet tested on this version of isolate!")
         choice = input("Are you sure you would like to delete all data? (y/N) > ")
         if choice.lower() == "y":
             purge_app()
