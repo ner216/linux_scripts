@@ -32,7 +32,7 @@ def check_or_setup_docker_image() -> None:
         os.system(f"echo 'FROM ubuntu:24.04' > {CACHE_DIR}dockerfile")
         os.system(f"echo 'RUN apt update -y' >> {CACHE_DIR}dockerfile")
         os.system(f"echo 'RUN apt upgrade -y' >> {CACHE_DIR}dockerfile")
-        os.system(f"echo 'RUN apt install evince -y' >> {CACHE_DIR}dockerfile")
+        os.system(f"echo 'RUN apt install apt-utils evince -y' >> {CACHE_DIR}dockerfile")
         
 
     #Create CACHE and CONFIG directory if it does not exist
@@ -229,7 +229,7 @@ def purge_app() -> None:
 def open_pdf_file(path:str, verbose:bool):
     # Check for dependancies before running application
     depend_check()
-    x11docker_command = f"x11docker --nxagent {DOCKER_IMAGE_TAG} --clipboard --share {path}:ro evince {path}"
+    x11docker_command = f"x11docker --nxagent {DOCKER_IMAGE_TAG} --clipboard --share {path} evince {path}"
 
     # Run docker command and capture output
     print("Running PDF viewer Evince...")
