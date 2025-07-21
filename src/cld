@@ -188,8 +188,8 @@ def save_push_pull_dates(direction: str):
         dates_data = {
             "last_pull": None,
             "last_push": None,
-            "last_pull_epoch": None,
-            "last_push_epoch": None
+            "last_pull_epoch": 0,
+            "last_push_epoch": 0
         }
 
     #Set new date
@@ -246,8 +246,8 @@ def get_last_push_pull() -> dict:
         dates_data = {
             "last_pull": None,
             "last_push": None,
-            "last_pull_epoch": None,
-            "last_push_epoch": None
+            "last_pull_epoch": 0,
+            "last_push_epoch": 0
         }
 
     return dates_data
@@ -285,6 +285,7 @@ def status() -> None:
     # Get the most recent push or pull epoch date
     last_pull_or_push_epoch = 0
     last_pull_or_push_stamp = ""
+
     if history_dates_data["last_pull_epoch"] >= history_dates_data["last_push_epoch"]:
         last_pull_or_push_epoch = history_dates_data["last_pull_epoch"]
         last_pull_or_push_stamp = history_dates_data["last_pull"]
