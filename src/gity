@@ -34,37 +34,6 @@ def find_local_repositories() -> list:
     
     return repositories
 
-def pull_repos(repositories: list) -> None:
-    print(f"{YELLOW}Warning! Executing git pull on all local repositories is not best practice!{RESET}")
-    confirm = input("Would you like to proceed? (N/y) > ")
-    if confirm != "y":
-        print("Command canceled")
-        exit(0)
-
-    for repo in repositories:
-        print(f"{YELLOW}[GITY] -> Executing git pull on [{repo}]{RESET}")
-        try:
-            os.chdir(repo)
-            pull_result = subprocess.run(['git', 'pull'], capture_output=True, text=True)
-            return_code = subprocess.call(['git', 'pull'])
-        except Exception as e:
-            print(f"{RED}[GITY] -> Error, unable to execute git pull on {repo}\n Exception: {e}{RESET}")
-
-def push_repos(repositories: list) -> None:
-    print(f"{YELLOW}Warning! Executing git push on all local repositories is not best practice!{RESET}")
-    confirm = input("Would you like to proceed? (N/y) > ")
-    if confirm != "y":
-        print("Command canceled")
-        exit(0)
-
-    for repo in repositories:
-        print(f"{YELLOW}[GITY] -> Executing git push on [{repo}]{RESET}")
-        try:
-            os.chdir(repo)
-            push_result = subprocess.run(['git', 'push'], capture_output=True, text=True)
-            return_code = subprocess.call(['git', 'push'])
-        except Exception as e:
-            print(f"{RED}[GITY] -> Error, unable to execute git push on {repo}\n Exception: {e}{RESET}")
 
 def status_repos(repositories: list) -> None:
     for repo in repositories:
@@ -80,8 +49,6 @@ def main():
     #Variables
     local_repositories = find_local_repositories()
     #Flag variables
-    pull_arg = False
-    push_arg = False
     status_arg = False
     help_arg = False
     version_info = False
@@ -89,10 +56,6 @@ def main():
     
     #Process arguments
     for arg in sys.argv:
-        if arg == "pull":
-            pull_arg = True
-        if arg == "push":
-            push_arg = True
         if arg == "list":
             list_local_repos = True
         if arg == "stat" or arg == "status":
@@ -103,11 +66,7 @@ def main():
             version_info = True
 
     #Run based on arguments
-    if pull_arg == True:
-        pull_repos(local_repositories)
-    elif push_arg == True:
-        push_repos(local_repositories)
-    elif status_arg == True:
+    if status_arg == True:
         status_repos(local_repositories)
     elif list_local_repos == True:
         print("Parent directories Gity will search:")
@@ -119,8 +78,6 @@ def main():
     elif help_arg == True:
         print("Commands: ")
         print(" -- List parent directories: gity list")
-        print(" -- Pull all repositories: gity pull")
-        print(" -- Push all repositories: gity push")
         print(" -- Get status on all repositories: gity [stat/status]")
         print(" -- Get version info: gity [version/ver]")
     elif version_info == True:
