@@ -5,6 +5,14 @@
 # With -a: show full awake/suspend timeline + totals since boot.
 #
 
+print_help() {
+    echo "View uptime that the system has been awake and suspended."
+    echo "Will output uptime since last suspend if no options are given."
+    echo "Options:"
+    echo " -a   Include a timeline of suspend status as well as total uptime breakdown."
+    echo " -h   Show this message."
+}
+
 format_duration() {
     local sec=$1
     local h=$(( sec/3600 ))
@@ -95,6 +103,8 @@ print_timeline() {
 # --- Main ---
 if [ "$1" = "-a" ]; then
     print_timeline
+elif [ "$1" = "-h" ]; then
+    print_help
 else
     print_summary
 fi
