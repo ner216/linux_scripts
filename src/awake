@@ -26,7 +26,7 @@ print_summary() {
     last_resume=$(journalctl --dmesg --grep="PM: suspend exit" -n1 --output=short-unix | \
                   awk '{print $1}' | cut -d. -f1)
 
-    if [ -z "$last_resume" ]; then
+    if [ -z "$last_resume" ] | [ "$last_resume" == "--" ]; then
         echo "Could not detect last resume time (no suspend events found)."
         exit 1
     fi
@@ -101,6 +101,12 @@ print_timeline() {
 }
 
 # --- Main ---
+# Exit if user is not root.
+if [ "$EUID" -ne 0 ]; then
+    echo "This script must be run with sudo or as root."
+    exit 1
+fi
+
 if [ "$1" = "-a" ]; then
     print_timeline
 elif [ "$1" = "-h" ]; then
