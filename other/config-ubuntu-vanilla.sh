@@ -29,17 +29,6 @@ remove_snap() {
     apt-mark hold snapd
     rm -rf ~/snap
     apt autoremove -y
-    
-    # Offer to replace snaps with flatpaks
-    read -p "Replace Firefox snap with flatpak? (y/n)> " choice
-    if [ $choice == "y" ]; then
-        apt remove -y firefox
-        apt autoremove -y
-        flatpak install flathub org.mozilla.firefox
-    elif [ $choice != "n" ]; then 
-        printf "Invalid input!\n"
-        exit 1
-    fi
 }
 
 setup_flatpak() {
@@ -47,11 +36,12 @@ setup_flatpak() {
     apt install -y flatpak
     flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
     
-    read -p "Replace pdf viewer flatpak? (y/n)> " choice
+    read -p "Replace pdf viewer and Firefox with flatpak? (y/n)> " choice
     if [ $choice == "y" ]; then
         apt remove -y papers
         apt autoremove -y
         flatpak install flathub org.gnome.Papers
+        flatpak install flathub org.mozilla.firefox
     elif [ $choice != "n" ]; then 
         printf "Invalid input!\n"
         exit 1
